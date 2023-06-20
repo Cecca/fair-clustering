@@ -37,6 +37,38 @@ def census1990():
     print(df.glimpse())
 
 
+def adult():
+    ofname = "data/adult.hdf5"
+    if os.path.isfile(ofname):
+        return ofname
+
+    url = "https://archive.ics.uci.edu/static/public/2/adult.zip"
+    fname = download(url, "data/adult.zip")
+    with zipfile.ZipFile(fname) as fpzip:
+        with fpzip.open("adult.data") as fp:
+            df = pl.read_csv(
+                fp, 
+                has_header=False,
+                new_columns=["age", "workclass", "final-weight", "education", "education-num", "marital-status", "occupation", "relationship", "race", "sex", "capital-gain", "capital-loss", "hours-per-week", "native-country"],
+                null_values="?"
+            )
+
+    colors = ["sex", "race", "marital-status"]
+    attributes = ["age", "final-weight", "education-num", "capital-gain", "hours-per-week"]
+    data = df.select(attributes).to_numpy()
+    data = StandardScaler().fit_transform(data)
+
+    encoders = dict((c, LabelEncoder()) for c in colors)
+    colors = df.select(
+        pl.col("sex").map(lambda c: encoders["sex"].fit_transform(c)).explode(),
+        pl.col("marital-status").map(lambda c: encoders["marital-status"].fit_transform(c)).explode(),
+        pl.col("race").map(lambda c: encoders["race"].fit_transform(c)).explode()
+    ).to_numpy()
+    write_hdf5(data, colors, encoders, ofname)
+    return ofname
+
+
+
 def diabetes():
     ofname = "data/diabetes.hdf5"
     if os.path.isfile(ofname):
@@ -82,4 +114,4 @@ def diabetes():
 
 
 if __name__ == "__main__":
-    diabetes()
+    adult()
