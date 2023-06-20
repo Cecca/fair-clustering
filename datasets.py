@@ -68,7 +68,6 @@ def adult():
     return ofname
 
 
-
 def diabetes():
     ofname = "data/diabetes.hdf5"
     if os.path.isfile(ofname):
@@ -111,6 +110,22 @@ def diabetes():
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
+
+
+DATASETS = {
+    "adult": adult,
+    "diabetes": diabetes
+}
+
+
+def load(name, color_idx):
+    fname = DATASETS[name]()
+    with h5py.File(fname, "r") as hfp:
+        data = hfp["data"][:]
+        colors = hfp["color"][:, color_idx]
+    unique_colors, color_counts = np.unique(color, return_counts=True)
+    color_proportion = color_counts / np.sum(color_counts)
+    return data, colors, color_proportion
 
 
 if __name__ == "__main__":
