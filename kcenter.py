@@ -4,6 +4,7 @@ import pandas as pd
 import pulp
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from umap import UMAP
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pulp import *
@@ -17,10 +18,14 @@ def eucl(a, b):
 def plot_clustering(data, centers, assignment):
     assignment = np.array([str(a) for a in assignment])
     plt.figure()
-    pca = PCA(n_components=2).fit_transform(data)
-    sns.scatterplot(x=pca[:,0], y=pca[:,1], hue=assignment, size=0.01, legend=False)
-    sns.scatterplot(x=pca[centers,0], y=pca[centers,1], color="red", legend=False)
-    plt.savefig("pca.png")
+    if data.shape[0] > 40000:
+        print("too much data, using PCA instead of UMAP", file=sys.stderr)
+        projection = PCA(n_components=2).fit_transform(data)
+    else:
+        projection = UMAP().fit_transform(data)
+    sns.scatterplot(x=projection[:,0], y=projection[:,1], hue=assignment, size=0.01, legend=False)
+    sns.scatterplot(x=projection[centers,0], y=projection[centers,1], color="red", legend=False)
+    plt.savefig("clustering.png")
 
 
 def load_data(path, columns, color_column, head=None, sep=",", plot_path=None, pca_dims=None):
@@ -257,11 +262,11 @@ def assign_original_points(colors, color_map, proxy, coreset_ids, coreset_center
 
 
 def main():
-    k = 4
+    k = 2
     path = "data/adult.csv"
     columns = ["age", "final-weight", "education-num", "capital-gain", "hours-per-week"]
     protected = "sex"
-    data, colors, color_map, color_proportion = load_data(path, columns, protected, pca_dims=2)
+    data, colors, color_map, color_proportion = load_data(path, columns, protected)
 
     greedy_centers, greedy_assignment = greedy_minimum_maximum(data, k)
     greedy_radius = cluster_radii(data, greedy_centers, greedy_assignment)
