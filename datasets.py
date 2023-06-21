@@ -1,6 +1,7 @@
 import h5py
 import polars as pl
 import numpy as np
+import umap
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import requests
@@ -25,6 +26,7 @@ def write_hdf5(data, colors, encoders, fname):
     with h5py.File(fname, "w") as hfp:
         hfp["data"] = data
         hfp["data-PCA"] = PCA().fit_transform(data)
+        hfp["data-UMAP"] = umap.UMAP().fit_transform(data)
         hfp["colors"] = colors
         for k in encoders:
             hfp["colors"].attrs[f"encoding-{k}"] = encoders[k].classes_.astype(bytes)
@@ -120,13 +122,31 @@ DATASETS = {
 
 def load(name, color_idx):
     fname = DATASETS[name]()
+    print("Opening", fname)
     with h5py.File(fname, "r") as hfp:
         data = hfp["data"][:]
-        colors = hfp["color"][:, color_idx]
-    unique_colors, color_counts = np.unique(color, return_counts=True)
+        colors = hfp["colors"][:, color_idx]
+    unique_colors, color_counts = np.unique(colors, return_counts=True)
     color_proportion = color_counts / np.sum(color_counts)
     return data, colors, color_proportion
 
 
+def load_pca2(name):
+    fname = DATASETS[name]()
+    with h5py.File(fname, "r") as hfp:
+        data = hfp["data-PCA"][:,:2]
+    return data
+
+def load_umap(name):
+    fname = DATASETS[name]()
+    with h5py.File(fname, "r") as hfp:
+        data = hfp["data-UMAP"][:]
+    return data
+
+
 if __name__ == "__main__":
-    adult()
+    for dataset in DATASETS:
+        print("Preprocessing", dataset)
+        preprocessing = DATASETS[dataset]
+        preprocessing()
+

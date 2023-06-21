@@ -4,11 +4,12 @@ import pandas as pd
 import pulp
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from umap import UMAP
+# from umap import UMAP
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pulp import *
 from pulp.apis import COIN_CMD
+import datasets
 
 
 def eucl(a, b):
@@ -16,35 +17,21 @@ def eucl(a, b):
 
 
 def plot_clustering(data, centers, assignment):
-    assignment = np.array([str(a) for a in assignment])
-    plt.figure()
-    if data.shape[0] > 40000:
-        print("too much data, using PCA instead of UMAP", file=sys.stderr)
-        projection = PCA(n_components=2).fit_transform(data)
-    else:
-        projection = UMAP().fit_transform(data)
-    sns.scatterplot(x=projection[:,0], y=projection[:,1], hue=assignment, size=0.01, legend=False)
-    sns.scatterplot(x=projection[centers,0], y=projection[centers,1], color="red", legend=False)
+    unique, counts = np.unique(assignment, return_counts=True)
+    cluster = unique[np.argsort(-counts)]
+    plt.figure(figsize=(10, 10))
+    if data.shape[1] > 2:
+        print("projecting to 2 dimensions", file=sys.stderr)
+        data = PCA(n_components=2).fit_transform(data)
+
+    for c in cluster:
+        cdata = data[assignment == c]
+        plt.scatter(cdata[:,0], cdata[:,1], s=10)
+
+    plt.scatter(data[centers,0], data[centers,1], s=200, marker="x", c="black")
+
+    plt.tight_layout()
     plt.savefig("clustering.png")
-
-
-def load_data(path, columns, color_column, head=None, sep=",", plot_path=None, pca_dims=None):
-    df = pd.read_csv(path)
-    if head is not None:
-        df = df.head(head)
-    data = df[columns].values
-    data = StandardScaler().fit_transform(data)
-    color = df[color_column].values
-    unique_colors, color_counts = np.unique(color, return_counts=True)
-    color_map = dict((c, i) for i, c in enumerate(unique_colors))
-    color_proportion = color_counts / np.sum(color_counts)
-    if pca_dims is not None:
-        data = PCA(n_components=pca_dims).fit_transform(data)
-    if plot_path is not None:
-        pca = PCA(n_components=2).fit_transform(data)
-        sns.scatterplot(x=pca[:,0], y=pca[:,1], hue=color)
-        plt.savefig(plot_path)
-    return data, color, color_map, color_proportion
 
 
 def greedy_minimum_maximum(data, k, return_assignment=True, seed=123):
@@ -76,17 +63,18 @@ def cluster_radii(data, centers, assignment):
     return np.array([
         np.max(eucl(data[assignment == c], data[centers[c]]))
         for c in range(centers.shape[0])
+        if np.any(assignment == c) # it might be that some cluster has even 
+                                   # its center assigned to some other
     ])
 
 
-def build_coreset(data, tau, colors, color_map, seed=42):
+def build_coreset(data, tau, colors, seed=42):
     point_ids, proxy = greedy_minimum_maximum(data, tau, seed=seed)
-    ncolors = len(color_map)
+    ncolors = np.max(colors) + 1
     coreset_points = data[point_ids]
     coreset_weights = np.zeros((coreset_points.shape[0], ncolors), dtype=np.int64)
     for color, proxy_idx in zip(colors, proxy):
-        color_idx = color_map[color]
-        coreset_weights[proxy_idx,color_idx] += 1
+        coreset_weights[proxy_idx,color] += 1
     # cradius = cluster_radii(data, point_ids, proxy)
     # print("coreset radius", np.max(cradius))
     return point_ids, coreset_points, proxy, coreset_weights
@@ -247,12 +235,11 @@ def fair_assignment(k, coreset, weights, fairness_contraints):
     return centers, round_assignment(n, k, len(fairness_contraints), wassignment, weights)
 
 
-def assign_original_points(colors, color_map, proxy, coreset_ids, coreset_centers, coreset_assignment):
+def assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment):
     centers = coreset_ids[coreset_centers]
     k = coreset_centers.shape[0]
     assignment = np.zeros(colors.shape[0], dtype=np.int64)
     for x, (color, p) in enumerate(zip(colors, proxy)):
-        color = color_map[color]
         # look for the first cluster with budget for that color
         for c in range(k):
             if (p,c,color) in coreset_assignment and coreset_assignment[p,c,color] > 0:
@@ -262,15 +249,14 @@ def assign_original_points(colors, color_map, proxy, coreset_ids, coreset_center
 
 
 def main():
-    k = 2
-    path = "data/adult.csv"
-    columns = ["age", "final-weight", "education-num", "capital-gain", "hours-per-week"]
-    protected = "sex"
-    data, colors, color_map, color_proportion = load_data(path, columns, protected)
+    k = 16
+    dataset = "diabetes"
+    data, colors, color_proportion = datasets.load(dataset, 0)
 
     greedy_centers, greedy_assignment = greedy_minimum_maximum(data, k)
     greedy_radius = cluster_radii(data, greedy_centers, greedy_assignment)
     print("greedy radius", greedy_radius)
+    print("max greedy radius", np.max( greedy_radius ))
 
     delta = 0.01
 
@@ -279,13 +265,14 @@ def main():
         for p in color_proportion
     ]
 
-    coreset_ids, coreset, proxy, weights = build_coreset(data, k*50, colors, color_map)
+    coreset_ids, coreset, proxy, weights = build_coreset(data, k*40, colors)
 
     coreset_centers, coreset_assignment = fair_assignment(k, coreset, weights, fairness_contraints)
-    centers, assignment = assign_original_points(colors, color_map, proxy, coreset_ids, coreset_centers, coreset_assignment)
+    centers, assignment = assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment)
     fair_radius = cluster_radii(data, centers, assignment)
     print("fair radius", fair_radius)
-    plot_clustering(data, centers, assignment)
+    print("max fair radius", np.max( fair_radius ))
+    plot_clustering(datasets.load_umap(dataset), centers, assignment)
 
 
 if __name__ == "__main__":
