@@ -1,5 +1,7 @@
+import warnings
 import h5py
 import polars as pl
+import pandas as pd
 import numpy as np
 import umap
 from sklearn.decomposition import PCA
@@ -26,17 +28,67 @@ def write_hdf5(data, colors, encoders, fname):
     with h5py.File(fname, "w") as hfp:
         hfp["data"] = data
         hfp["data-PCA"] = PCA().fit_transform(data)
-        hfp["data-UMAP"] = umap.UMAP().fit_transform(data)
+        if data.shape[0] < 40000:
+            hfp["data-UMAP"] = umap.UMAP().fit_transform(data)
+        else:
+            warnings.warn("Dataset too large, skipping UMAP mapping")
         hfp["colors"] = colors
         for k in encoders:
             hfp["colors"].attrs[f"encoding-{k}"] = encoders[k].classes_.astype(bytes)
 
 
+def creditcard():
+    ofname = "data/creditcard.hdf5"
+    if os.path.isfile(ofname):
+        return ofname
+
+    url = "https://archive.ics.uci.edu/static/public/350/default+of+credit+card+clients.zip"
+    fname = download(url, "data/creditcard.zip")
+    with zipfile.ZipFile(fname) as fpzip:
+        with fpzip.open("default of credit card clients.xls") as fp:
+            df = pd.read_excel(
+                fp,
+                header=1
+            )
+            df = pl.from_pandas(df)
+
+    attributes = ["LIMIT_BAL","AGE","BILL_AMT1","BILL_AMT2","BILL_AMT3","BILL_AMT4","BILL_AMT5","BILL_AMT6","PAY_AMT1","PAY_AMT2","PAY_AMT3","PAY_AMT4","PAY_AMT5","PAY_AMT6"]
+    colors = ["SEX", "EDUCATION", "MARRIAGE"]
+
+    data = df.select(attributes).to_numpy()
+    data = StandardScaler().fit_transform(data)
+
+    encoders = dict((c, LabelEncoder()) for c in colors)
+    colors = df.select(
+        pl.col("SEX").map(lambda c: encoders["SEX"].fit_transform(c)).explode(),
+        pl.col("MARRIAGE").map(lambda c: encoders["MARRIAGE"].fit_transform(c)).explode(),
+        pl.col("EDUCATION").map(lambda c: encoders["EDUCATION"].fit_transform(c)).explode()
+    ).to_numpy()
+    write_hdf5(data, colors, encoders, ofname)
+    return ofname
+
+
 def census1990():
+    ofname = "data/census1990.hdf5"
+    if os.path.isfile(ofname):
+        return ofname
+
     url = "https://web.archive.org/web/20170711094723/https://archive.ics.uci.edu/ml/machine-learning-databases/census1990-mld/USCensus1990.data.txt"
     fname = download(url, "data/census1990.txt")
     df = pl.read_csv(fname)
-    print(df.glimpse())
+    attributes = ["dAncstry1","dAncstry2","iAvail","iCitizen","iClass","dDepart","iDisabl1","iDisabl2","iEnglish","iFeb55","iFertil","dHispanic","dHour89","dHours","iImmigr","dIncome1","dIncome2","dIncome3","dIncome4","dIncome5","dIncome6","dIncome7","dIncome8","dIndustry","iKorean","iLang1","iLooking","iMarital","iMay75880","iMeans","iMilitary","iMobility","iMobillim","dOccup","iOthrserv","iPerscare","dPOB","dPoverty","dPwgt1","iRagechld","dRearning","iRelat1","iRelat2","iRemplpar","iRiders","iRlabor","iRownchld","dRpincome","iRPOB","iRrelchld","iRspouse","iRvetserv","iSchool","iSept80","iSubfam1","iSubfam2","iTmpabsnt","dTravtime","iVietnam","dWeek89","iWork89","iWorklwk","iWWII","iYearsch","iYearwrk","dYrsserv"]
+    colors = ["dAge", 'iSex']
+
+    data = df.select(attributes).to_numpy()
+    data = StandardScaler().fit_transform(data)
+
+    encoders = dict((c, LabelEncoder()) for c in colors)
+    colors = df.select(
+        pl.col("dAge").map(lambda c: encoders["dAge"].fit_transform(c)).explode(),
+        pl.col("iSex").map(lambda c: encoders["iSex"].fit_transform(c)).explode()
+    ).to_numpy()
+    write_hdf5(data, colors, encoders, ofname)
+    return ofname
 
 
 def adult():
@@ -116,7 +168,9 @@ def diabetes():
 
 DATASETS = {
     "adult": adult,
-    "diabetes": diabetes
+    "diabetes": diabetes,
+    "census1990": census1990,
+    "creditcard": creditcard
 }
 
 

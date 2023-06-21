@@ -4,7 +4,6 @@ import pandas as pd
 import pulp
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-# from umap import UMAP
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pulp import *
@@ -16,7 +15,7 @@ def eucl(a, b):
     return np.sqrt(np.linalg.norm(a - b, axis=1))
 
 
-def plot_clustering(data, centers, assignment):
+def plot_clustering(data, centers, assignment, filename="clustering.png"):
     unique, counts = np.unique(assignment, return_counts=True)
     cluster = unique[np.argsort(-counts)]
     plt.figure(figsize=(10, 10))
@@ -31,7 +30,7 @@ def plot_clustering(data, centers, assignment):
     plt.scatter(data[centers,0], data[centers,1], s=200, marker="x", c="black")
 
     plt.tight_layout()
-    plt.savefig("clustering.png")
+    plt.savefig(filename)
 
 
 def greedy_minimum_maximum(data, k, return_assignment=True, seed=123):
@@ -249,11 +248,12 @@ def assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_
 
 
 def main():
-    k = 16
-    dataset = "diabetes"
+    k = 64
+    dataset = "creditcard"
     data, colors, color_proportion = datasets.load(dataset, 0)
 
     greedy_centers, greedy_assignment = greedy_minimum_maximum(data, k)
+    plot_clustering(datasets.load_pca2(dataset), greedy_centers, greedy_assignment, filename="greedy.png")
     greedy_radius = cluster_radii(data, greedy_centers, greedy_assignment)
     print("greedy radius", greedy_radius)
     print("max greedy radius", np.max( greedy_radius ))
@@ -265,14 +265,14 @@ def main():
         for p in color_proportion
     ]
 
-    coreset_ids, coreset, proxy, weights = build_coreset(data, k*40, colors)
+    coreset_ids, coreset, proxy, weights = build_coreset(data, k*80, colors)
 
     coreset_centers, coreset_assignment = fair_assignment(k, coreset, weights, fairness_contraints)
     centers, assignment = assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment)
     fair_radius = cluster_radii(data, centers, assignment)
     print("fair radius", fair_radius)
     print("max fair radius", np.max( fair_radius ))
-    plot_clustering(datasets.load_umap(dataset), centers, assignment)
+    plot_clustering(datasets.load_pca2(dataset), centers, assignment)
 
 
 if __name__ == "__main__":
