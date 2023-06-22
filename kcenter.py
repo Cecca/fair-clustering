@@ -12,6 +12,7 @@ from pulp.apis import COIN_CMD
 from numba import njit
 from numba.typed import List
 import datasets
+import output
 import logging
 
 
@@ -322,7 +323,8 @@ def main():
     logging.info("Violation: %s", np.abs(greedy_violations).max())
 
     # Fair
-    coreset_ids, coreset, proxy, weights = build_coreset(data, k*10, colors)
+    tau = k*10
+    coreset_ids, coreset, proxy, weights = build_coreset(data, tau, colors)
     logging.info("total weight %f", np.sum(weights))
 
     coreset_centers, coreset_assignment = fair_assignment(k, coreset, weights, fairness_constraints)
@@ -333,6 +335,11 @@ def main():
     plot_clustering(datasets.load_pca2(dataset), centers, assignment)
     violations = evaluate_fairness(k, colors, assignment, fairness_constraints)
     logging.info("Violation: %s", np.abs(violations).max())
+
+    output.write_clustering("results.hdf5", centers, assignment, dataset, "fair-coreset", k, {
+        "delta": delta,
+        "tau": tau
+    })
 
 
 if __name__ == "__main__":
