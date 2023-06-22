@@ -4,6 +4,7 @@ import pandas as pd
 import pulp
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import pairwise_distances, euclidean_distances
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pulp import *
