@@ -256,7 +256,7 @@ def fair_assignment(k, coreset, weights, fairness_contraints):
 
 
 
-def assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment):
+def assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment, self_centers=False):
     logging.info("Assigning original points")
     centers = coreset_ids[coreset_centers]
     k = coreset_centers.shape[0]
@@ -267,27 +267,26 @@ def assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_
             budget[c,color] += assignment[p,c,color]
         return budget
 
-    proxy_sizes = np.zeros((proxy.max() + 1, colors.max() + 1), dtype=np.int32)
-    for (color, p) in zip(colors, proxy):
-        proxy_sizes[p,color] += 1
-    assert np.sum(proxy_sizes) == colors.shape[0]
-    print("proxy sizes")
+    # proxy_sizes = np.zeros((proxy.max() + 1, colors.max() + 1), dtype=np.int32)
+    # for (color, p) in zip(colors, proxy):
+    #     proxy_sizes[p,color] += 1
+    # assert np.sum(proxy_sizes) == colors.shape[0]
+    # print("proxy sizes")
 
     assignment = np.ones(colors.shape[0], dtype=np.int64) * 99999999
     for x, (color, p) in enumerate(zip(colors, proxy)):
-        # look for the first cluster with budget for that color
-        pcenters = []
-        for c in range(k):
-            if (p,c,color) in coreset_assignment:
-                pcenters.append((c, coreset_assignment[p,c,color]))
-                if coreset_assignment[p,c,color] > 0:
-                    candidates = [i for i in range(k) if centers[i] == coreset_ids[coreset_centers[c]]]
-                    assert len(candidates) == 1
-                    assignment[x] = candidates[0]
-                    coreset_assignment[p,c,color] -= 1
-                    break
-        assert len(pcenters) > 0
-        assert assignment[x] <= k, f"not assigned: point {x} color {color} proxy {p} proxy centers {pcenters} budget \n{assignment_to_budget(coreset_assignment)}"
+        if self_centers and x in centers:
+            assignment[x] = [i for i in range(k) if centers[i] == x][0]
+        else:
+            # look for the first cluster with budget for that color
+            for c in range(k):
+                if (p,c,color) in coreset_assignment:
+                    if coreset_assignment[p,c,color] > 0:
+                        candidates = [i for i in range(k) if centers[i] == coreset_ids[coreset_centers[c]]]
+                        assert len(candidates) == 1
+                        assignment[x] = candidates[0]
+                        coreset_assignment[p,c,color] -= 1
+                        break
     assert assignment.max() <= k, "there are some unassigned points!"
     return centers, assignment
 
@@ -316,7 +315,7 @@ def evaluate_fairness(k, colors, assignment, fairness_constraints):
     
 
 def main():
-    k = 32
+    k = 64
     dataset = "creditcard"
     data, colors, color_proportion = datasets.load(dataset, 0)
 
@@ -337,11 +336,11 @@ def main():
     logging.info(greedy_violations)
 
     # Fair
-    coreset_ids, coreset, proxy, weights = build_coreset(data, k*40, colors)
+    coreset_ids, coreset, proxy, weights = build_coreset(data, k*10, colors)
     logging.info("total weight %f", np.sum(weights))
 
     coreset_centers, coreset_assignment = fair_assignment(k, coreset, weights, fairness_constraints)
-    centers, assignment = assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment)
+    centers, assignment = assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment, self_centers=True)
     fair_radius = cluster_radii(data, centers, assignment)
     logging.info("fair radius %s", fair_radius)
     logging.info("max fair radius %s", np.max( fair_radius ))
