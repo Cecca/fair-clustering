@@ -8,7 +8,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pulp import *
 from pulp.apis import COIN_CMD
+from numba import njit
+from numba.typed import List
 import datasets
+import logging
 
 
 def eucl(a, b):
@@ -20,7 +23,7 @@ def plot_clustering(data, centers, assignment, filename="clustering.png"):
     cluster = unique[np.argsort(-counts)]
     plt.figure(figsize=(10, 10))
     if data.shape[1] > 2:
-        print("projecting to 2 dimensions", file=sys.stderr)
+        logging.info("projecting to 2 dimensions")
         data = PCA(n_components=2).fit_transform(data)
 
     for c in cluster:
@@ -69,13 +72,14 @@ def cluster_radii(data, centers, assignment):
 
 def build_coreset(data, tau, colors, seed=42):
     point_ids, proxy = greedy_minimum_maximum(data, tau, seed=seed)
+    # plot_clustering(data, point_ids, proxy, filename="coreset.png")
     ncolors = np.max(colors) + 1
     coreset_points = data[point_ids]
     coreset_weights = np.zeros((coreset_points.shape[0], ncolors), dtype=np.int64)
     for color, proxy_idx in zip(colors, proxy):
         coreset_weights[proxy_idx,color] += 1
     # cradius = cluster_radii(data, point_ids, proxy)
-    # print("coreset radius", np.max(cradius))
+    # logging.info("coreset radius", np.max(cradius))
     return point_ids, coreset_points, proxy, coreset_weights
 
 
@@ -89,7 +93,7 @@ def do_fair_assignment(R, costs, weights, fairness_constraints):
             if costs[x,c] <= R:
                 for color in range(ncolors):
                     if weights[x, color] > 0:
-                        vars[x,c,color] = LpVariable(f"x_{x}_{c}_{color}", 0)
+                        vars[x,c,color] = LpVariable(f"x_{x}_{c}_{color}", 0, cat="Continuous")
     
     # All the weight should be assigned
     for x in range(n):
@@ -111,7 +115,7 @@ def do_fair_assignment(R, costs, weights, fairness_constraints):
                 color_cluster_size <= alpha * cluster_size
             )
 
-    prob.solve(COIN_CMD(mip=False, msg=False))
+    prob.solve(COIN_CMD(mip=True, msg=False))
     if LpStatus[prob.status] == "Optimal":
         wassignment = {} #np.zeros((n,k,ncolors))
         for x in range(n):
@@ -146,7 +150,9 @@ def round_assignment(n, k, ncolors, weighted_assignment, weights):
     blacklist = set()
     blacklist_colored = set()
 
+    logging.info("variables to round: %d", len(vars))
     while len(vars) > 0:
+        logging.info("There are still %d variables to round", len(vars))
         lp = LpProblem()
         for x in range(n):
             for color in range(ncolors):
@@ -204,8 +210,16 @@ def round_assignment(n, k, ncolors, weighted_assignment, weights):
     return assignment
 
 
+def _sum_cluster_weights(k, ncolors, assignment):
+    s = np.zeros(( k, ncolors ))
+    for (x, c, col) in assignment:
+        s[c, col] += assignment[x,c,col]
+    return s
+
+
 def fair_assignment(k, coreset, weights, fairness_contraints):
     n = coreset.shape[0]
+    ncolors = weights.shape[1]
     centers = greedy_minimum_maximum(coreset, k, return_assignment=False)
     costs = np.zeros((coreset.shape[0], k))
     for c in range(k):
@@ -218,8 +232,13 @@ def fair_assignment(k, coreset, weights, fairness_contraints):
         while low <= high:
             mid = low + (high - low) // 2
             R = allcosts[mid]
-            print("R", R)
+            logging.info("R %f", R)
             assignment = do_fair_assignment(R, costs, weights, fairness_contraints)
+            logging.info("  clustering {}".format("feasible" if assignment is not None else "unfeasible"))
+            if assignment is not None:
+                cluster_weights = _sum_cluster_weights(k, ncolors, assignment)#.astype(np.int32)
+                total_weight = np.sum(cluster_weights)
+                logging.info("  cluster weights (total %f)\n%s", total_weight, cluster_weights)
             if low == high:
                 return assignment
             if assignment is None:
@@ -231,49 +250,106 @@ def fair_assignment(k, coreset, weights, fairness_contraints):
                     high = mid
 
     wassignment = binary_search()
-    return centers, round_assignment(n, k, len(fairness_contraints), wassignment, weights)
-
-
-def assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment):
-    centers = coreset_ids[coreset_centers]
-    k = coreset_centers.shape[0]
-    assignment = np.zeros(colors.shape[0], dtype=np.int64)
-    for x, (color, p) in enumerate(zip(colors, proxy)):
-        # look for the first cluster with budget for that color
-        for c in range(k):
-            if (p,c,color) in coreset_assignment and coreset_assignment[p,c,color] > 0:
-                assignment[x] = [i for i in range(k) if centers[i] == coreset_ids[coreset_centers[c]]][0]
-                coreset_assignment[p,c,color] -= 1
+    assignment = round_assignment(n, k, len(fairness_contraints), wassignment, weights)
     return centers, assignment
 
 
+
+
+def assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment):
+    logging.info("Assigning original points")
+    centers = coreset_ids[coreset_centers]
+    k = coreset_centers.shape[0]
+
+    def assignment_to_budget(assignment):
+        budget = np.zeros((k, colors.max() + 1), dtype=np.int32)
+        for (p, c, color) in assignment:
+            budget[c,color] += assignment[p,c,color]
+        return budget
+
+    proxy_sizes = np.zeros((proxy.max() + 1, colors.max() + 1), dtype=np.int32)
+    for (color, p) in zip(colors, proxy):
+        proxy_sizes[p,color] += 1
+    assert np.sum(proxy_sizes) == colors.shape[0]
+    print("proxy sizes")
+
+    assignment = np.ones(colors.shape[0], dtype=np.int64) * 99999999
+    for x, (color, p) in enumerate(zip(colors, proxy)):
+        # look for the first cluster with budget for that color
+        pcenters = []
+        for c in range(k):
+            if (p,c,color) in coreset_assignment:
+                pcenters.append((c, coreset_assignment[p,c,color]))
+                if coreset_assignment[p,c,color] > 0:
+                    candidates = [i for i in range(k) if centers[i] == coreset_ids[coreset_centers[c]]]
+                    assert len(candidates) == 1
+                    assignment[x] = candidates[0]
+                    coreset_assignment[p,c,color] -= 1
+                    break
+        assert len(pcenters) > 0
+        assert assignment[x] <= k, f"not assigned: point {x} color {color} proxy {p} proxy centers {pcenters} budget \n{assignment_to_budget(coreset_assignment)}"
+    assert assignment.max() <= k, "there are some unassigned points!"
+    return centers, assignment
+
+
+@njit
+def evaluate_fairness(k, colors, assignment, fairness_constraints):
+    ncolors = np.max(colors) + 1
+    counts = np.zeros((k, ncolors), dtype=np.int32)
+    # Count the cluster size for each color
+    for c, color in zip(assignment, colors):
+        counts[c,color] += 1
+    print("cluster sizes\n", counts)
+    additive_violations = np.zeros((k, ncolors), dtype=np.int32)
+    for c in range(k):
+        cluster = counts[c]
+        size = np.sum(cluster)
+        for color in range(ncolors):
+            beta, alpha = fairness_constraints[color]
+            low, high = np.floor(beta * size), np.ceil(alpha * size)
+            csize = counts[c,color]
+            if csize < low:
+                additive_violations[c,color] = csize - low
+            elif csize > high:
+                additive_violations[c,color] = csize - high
+    return additive_violations
+    
+
 def main():
-    k = 64
+    k = 32
     dataset = "creditcard"
     data, colors, color_proportion = datasets.load(dataset, 0)
 
+    delta = 0.1
+
+    fairness_constraints = List([
+        (p * (1-delta), p / (1-delta))
+        for p in color_proportion
+    ])
+
+    # Greedy
     greedy_centers, greedy_assignment = greedy_minimum_maximum(data, k)
     plot_clustering(datasets.load_pca2(dataset), greedy_centers, greedy_assignment, filename="greedy.png")
     greedy_radius = cluster_radii(data, greedy_centers, greedy_assignment)
-    print("greedy radius", greedy_radius)
-    print("max greedy radius", np.max( greedy_radius ))
+    logging.info("greedy radius %s", greedy_radius)
+    logging.info("max greedy radius %s", np.max( greedy_radius ))
+    greedy_violations = evaluate_fairness(k, colors, greedy_assignment, fairness_constraints)
+    logging.info(greedy_violations)
 
-    delta = 0.01
+    # Fair
+    coreset_ids, coreset, proxy, weights = build_coreset(data, k*40, colors)
+    logging.info("total weight %f", np.sum(weights))
 
-    fairness_contraints = [
-        (p * (1-delta), p / (1-delta))
-        for p in color_proportion
-    ]
-
-    coreset_ids, coreset, proxy, weights = build_coreset(data, k*80, colors)
-
-    coreset_centers, coreset_assignment = fair_assignment(k, coreset, weights, fairness_contraints)
+    coreset_centers, coreset_assignment = fair_assignment(k, coreset, weights, fairness_constraints)
     centers, assignment = assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment)
     fair_radius = cluster_radii(data, centers, assignment)
-    print("fair radius", fair_radius)
-    print("max fair radius", np.max( fair_radius ))
+    logging.info("fair radius %s", fair_radius)
+    logging.info("max fair radius %s", np.max( fair_radius ))
     plot_clustering(datasets.load_pca2(dataset), centers, assignment)
+    violations = evaluate_fairness(k, colors, assignment, fairness_constraints)
+    logging.info(violations)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main()
