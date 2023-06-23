@@ -11,11 +11,50 @@ from pulp.apis import COIN_CMD
 from numba import njit
 from numba.typed import List
 import logging
+import time
 
 import datasets
 import results
 import assess
 import viz
+
+
+
+class UnfairKCenter(object):
+    def __init__(self, k, seed=123):
+        self.k = k
+        self.seed = seed
+
+    def name(self):
+        return "unfair-k-center"
+
+    def time(self):
+        return self.elapsed
+
+    def fit_predict(self, X):
+        start = time.time()
+        np.random.seed(self.seed)
+
+        centers = [np.random.choice(X.shape[0])]
+        distances = pairwise_distances(X, X[centers[-1]].reshape(1,-1))
+        while len(centers) < self.k:
+            farthest = np.argmax(distances)
+            centers.append(farthest)
+            distances = np.minimum(
+                pairwise_distances(X, X[centers[-1]].reshape(1,-1)),
+                distances
+            ) 
+        
+        self.centers = np.array(centers)
+
+        self.assignment = np.array([
+            np.argmin(pairwise_distances(X[centers], X[x].reshape(1, -1)))
+            for x in range(X.shape[0])
+        ])
+        assert np.all(self.assignment[centers] == np.arange(self.k))
+        end = time.time()
+        self.elapsed = end - start
+        return self.assignment
 
 
 def greedy_minimum_maximum(data, k, return_assignment=True, seed=123):
@@ -274,15 +313,9 @@ def evaluate_fairness(k, colors, assignment, fairness_constraints):
 
 def main():
     k = 8
-    dataset = "creditcard"
-    data, colors, color_proportion = datasets.load(dataset, 0)
-
     delta = 0.1
-
-    fairness_constraints = List([
-        (p * (1-delta), p / (1-delta))
-        for p in color_proportion
-    ])
+    dataset = "creditcard"
+    data, colors, fairness_constraints = datasets.load(dataset, 0, delta)
 
     # Greedy
     greedy_centers, greedy_assignment = greedy_minimum_maximum(data, k)

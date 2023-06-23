@@ -6,6 +6,7 @@ import numpy as np
 import umap
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from numba.typed import List
 import requests
 import os
 import zipfile
@@ -174,7 +175,7 @@ DATASETS = {
 }
 
 
-def load(name, color_idx):
+def load(name, color_idx, delta=0.0):
     fname = DATASETS[name]()
     print("Opening", fname)
     with h5py.File(fname, "r") as hfp:
@@ -182,7 +183,11 @@ def load(name, color_idx):
         colors = hfp["colors"][:, color_idx]
     unique_colors, color_counts = np.unique(colors, return_counts=True)
     color_proportion = color_counts / np.sum(color_counts)
-    return data, colors, color_proportion
+    fairness_constraints = List([
+        (p * (1-delta), p / (1-delta))
+        for p in color_proportion
+    ])
+    return data, colors, fairness_constraints
 
 
 def load_pca2(name):

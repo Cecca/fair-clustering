@@ -22,6 +22,28 @@ def radius(data, centers, assignment, all=False):
     else:
         return np.max(dists)
 
+
+def additive_violations(k, colors, assignment, fairness_constraints):
+    ncolors = np.max(colors) + 1
+    counts = np.zeros((k, ncolors), dtype=np.int32)
+    # Count the cluster size for each color
+    for c, color in zip(assignment, colors):
+        counts[c,color] += 1
+    additive_violations = np.zeros((k, ncolors), dtype=np.int32)
+    for c in range(k):
+        cluster = counts[c]
+        size = np.sum(cluster)
+        for color in range(ncolors):
+            beta, alpha = fairness_constraints[color]
+            low, high = np.floor(beta * size), np.ceil(alpha * size)
+            csize = counts[c,color]
+            if csize < low:
+                additive_violations[c,color] = csize - low
+            elif csize > high:
+                additive_violations[c,color] = csize - high
+    return np.abs(additive_violations).max()
+
+
 if __name__ == "__main__":
     f = "results.hdf5"
     dataset = "creditcard"

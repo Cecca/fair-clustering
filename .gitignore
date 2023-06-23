@@ -4,3 +4,4 @@ __pycache__
 clustering.png
 greedy.png
 results.hdf5
+results.db
