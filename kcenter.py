@@ -4,20 +4,18 @@ import pandas as pd
 import pulp
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import pairwise_distances, euclidean_distances
+from sklearn.metrics import pairwise_distances
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pulp import *
 from pulp.apis import COIN_CMD
 from numba import njit
 from numba.typed import List
-import datasets
-import output
 import logging
 
-
-def eucl(a, b):
-    return np.sqrt(np.linalg.norm(a - b, axis=1))
+import datasets
+import results
+import assess
 
 
 def plot_clustering(data, centers, assignment, filename="clustering.png"):
@@ -41,12 +39,12 @@ def plot_clustering(data, centers, assignment, filename="clustering.png"):
 def greedy_minimum_maximum(data, k, return_assignment=True, seed=123):
     np.random.seed(seed)
     centers = [np.random.choice(data.shape[0])]
-    distances = eucl(data, data[centers[-1]])
+    distances = pairwise_distances(data, data[centers[-1]].reshape(1,-1))
     while len(centers) < k:
         farthest = np.argmax(distances)
         centers.append(farthest)
         distances = np.minimum(
-            eucl(data, data[centers[-1]]),
+            pairwise_distances(data, data[centers[-1]].reshape(1,-1)),
             distances
         ) 
     
@@ -54,7 +52,7 @@ def greedy_minimum_maximum(data, k, return_assignment=True, seed=123):
 
     if return_assignment:
         assignment = np.array([
-            np.argmin(eucl(data[x], data[centers]))
+            np.argmin(pairwise_distances(data[centers], data[x].reshape(1, -1)))
             for x in range(data.shape[0])
         ])
         assert np.all(assignment[centers] == np.arange(k))
@@ -63,11 +61,6 @@ def greedy_minimum_maximum(data, k, return_assignment=True, seed=123):
         return centers
 
 
-def cluster_radii(data, centers, assignment):
-    return np.array([
-        np.max(eucl(data[assignment == c], data[centers[c]])) if np.any(assignment == c) else 0.0
-        for c in range(centers.shape[0])
-    ])
 
 
 def build_coreset(data, tau, colors, seed=42):
@@ -78,8 +71,6 @@ def build_coreset(data, tau, colors, seed=42):
     coreset_weights = np.zeros((coreset_points.shape[0], ncolors), dtype=np.int64)
     for color, proxy_idx in zip(colors, proxy):
         coreset_weights[proxy_idx,color] += 1
-    # cradius = cluster_radii(data, point_ids, proxy)
-    # logging.info("coreset radius", np.max(cradius))
     return point_ids, coreset_points, proxy, coreset_weights
 
 
@@ -221,10 +212,8 @@ def fair_assignment(k, coreset, weights, fairness_contraints):
     n = coreset.shape[0]
     ncolors = weights.shape[1]
     centers = greedy_minimum_maximum(coreset, k, return_assignment=False)
-    costs = np.zeros((coreset.shape[0], k))
-    for c in range(k):
-        costs[:,c] = eucl(coreset, coreset[centers[c]])
 
+    costs = pairwise_distances(coreset, coreset[centers])
     allcosts = np.sort(np.unique(costs))
 
     def binary_search():
@@ -302,11 +291,11 @@ def evaluate_fairness(k, colors, assignment, fairness_constraints):
     
 
 def main():
-    k = 64
+    k = 32
     dataset = "creditcard"
     data, colors, color_proportion = datasets.load(dataset, 0)
 
-    delta = 0.1
+    delta = 0.5
 
     fairness_constraints = List([
         (p * (1-delta), p / (1-delta))
@@ -316,27 +305,27 @@ def main():
     # Greedy
     greedy_centers, greedy_assignment = greedy_minimum_maximum(data, k)
     plot_clustering(datasets.load_pca2(dataset), greedy_centers, greedy_assignment, filename="greedy.png")
-    greedy_radius = cluster_radii(data, greedy_centers, greedy_assignment)
+    greedy_radius = assess.radius(data, greedy_centers, greedy_assignment)
     logging.info("greedy radius %s", greedy_radius)
     logging.info("max greedy radius %s", np.max( greedy_radius ))
     greedy_violations = evaluate_fairness(k, colors, greedy_assignment, fairness_constraints)
     logging.info("Violation: %s", np.abs(greedy_violations).max())
 
     # Fair
-    tau = k*10
+    tau = k*100
     coreset_ids, coreset, proxy, weights = build_coreset(data, tau, colors)
     logging.info("total weight %f", np.sum(weights))
 
     coreset_centers, coreset_assignment = fair_assignment(k, coreset, weights, fairness_constraints)
     centers, assignment = assign_original_points(colors, proxy, coreset_ids, coreset_centers, coreset_assignment, self_centers=False)
-    fair_radius = cluster_radii(data, centers, assignment)
+    fair_radius = assess.radius(data, centers, assignment)
     logging.info("fair radius %s", fair_radius)
     logging.info("max fair radius %s", np.max( fair_radius ))
     plot_clustering(datasets.load_pca2(dataset), centers, assignment)
     violations = evaluate_fairness(k, colors, assignment, fairness_constraints)
     logging.info("Violation: %s", np.abs(violations).max())
 
-    output.write_clustering("results.hdf5", centers, assignment, dataset, "fair-coreset", k, {
+    results.write_clustering("results.hdf5", centers, assignment, dataset, "fair-coreset", k, {
         "delta": delta,
         "tau": tau
     })
