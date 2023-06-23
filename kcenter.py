@@ -2,7 +2,6 @@ import sys
 import numpy as np
 import pandas as pd
 import pulp
-from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import pairwise_distances
 import matplotlib.pyplot as plt
@@ -16,24 +15,7 @@ import logging
 import datasets
 import results
 import assess
-
-
-def plot_clustering(data, centers, assignment, filename="clustering.png"):
-    unique, counts = np.unique(assignment, return_counts=True)
-    cluster = unique[np.argsort(-counts)]
-    plt.figure(figsize=(10, 10))
-    if data.shape[1] > 2:
-        logging.info("projecting to 2 dimensions")
-        data = PCA(n_components=2).fit_transform(data)
-
-    for c in cluster:
-        cdata = data[assignment == c]
-        plt.scatter(cdata[:,0], cdata[:,1], s=10)
-
-    plt.scatter(data[centers,0], data[centers,1], s=200, marker="x", c="black")
-
-    plt.tight_layout()
-    plt.savefig(filename)
+import viz
 
 
 def greedy_minimum_maximum(data, k, return_assignment=True, seed=123):
@@ -291,11 +273,11 @@ def evaluate_fairness(k, colors, assignment, fairness_constraints):
     
 
 def main():
-    k = 32
+    k = 8
     dataset = "creditcard"
     data, colors, color_proportion = datasets.load(dataset, 0)
 
-    delta = 0.5
+    delta = 0.1
 
     fairness_constraints = List([
         (p * (1-delta), p / (1-delta))
@@ -304,7 +286,7 @@ def main():
 
     # Greedy
     greedy_centers, greedy_assignment = greedy_minimum_maximum(data, k)
-    plot_clustering(datasets.load_pca2(dataset), greedy_centers, greedy_assignment, filename="greedy.png")
+    viz.plot_clustering(datasets.load_pca2(dataset), greedy_centers, greedy_assignment, filename="greedy.png")
     greedy_radius = assess.radius(data, greedy_centers, greedy_assignment)
     logging.info("greedy radius %s", greedy_radius)
     logging.info("max greedy radius %s", np.max( greedy_radius ))
@@ -321,7 +303,7 @@ def main():
     fair_radius = assess.radius(data, centers, assignment)
     logging.info("fair radius %s", fair_radius)
     logging.info("max fair radius %s", np.max( fair_radius ))
-    plot_clustering(datasets.load_pca2(dataset), centers, assignment)
+    viz.plot_clustering(datasets.load_pca2(dataset), centers, assignment)
     violations = evaluate_fairness(k, colors, assignment, fairness_constraints)
     logging.info("Violation: %s", np.abs(violations).max())
 
