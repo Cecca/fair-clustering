@@ -77,6 +77,7 @@ def get_db():
             radius       REAL,
             time_s       REAL,
             additive_violation INT,
+            additional_metrics  JSON,
             hdf5_key     TEXT
         );
         """
@@ -112,7 +113,7 @@ def already_run(dataset, algorithm, k, delta, attrs_dict):
 
     pass
 
-def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_dict, time_s):
+def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_dict, time_s, additional_metrics):
     data, colors, fairness_constraints = datasets.load(dataset, 0, delta)
     radius = assess.radius(data, centers, assignment)
     violation = assess.additive_violations(k, colors, assignment, fairness_constraints)
@@ -121,7 +122,7 @@ def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_
     with get_db() as db:
         db.execute("""
         INSERT INTO results VALUES (
-            DATETIME('now'), :dataset, :algorithm, :k, :delta, :params, :radius, :time_s, :additive_violation, :hdf5_key
+            DATETIME('now'), :dataset, :algorithm, :k, :delta, :params, :radius, :time_s, :additive_violation, :additional_metrics, :hdf5_key
         )
         """, {
             "dataset": dataset,
@@ -132,6 +133,7 @@ def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_
             "radius": radius,
             "time_s": time_s,
             "additive_violation": violation,
+            "additional_metrics": json.dumps(additional_metrics, sort_keys=True),
             "hdf5_key": key
         })
 
