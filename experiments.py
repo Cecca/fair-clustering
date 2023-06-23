@@ -26,7 +26,7 @@ if __name__ == "__main__":
         # Fair coreset
         for tau in [2*k, 8*k]:
             print(dataset,delta,k,tau)
-            algo = kcenter.CoresetFairKCenter(k, tau, integer_programming=True)
+            algo = kcenter.CoresetFairKCenter(k, tau, integer_programming=False)
             if not results.already_run(dataset, algo.name(), k, delta, algo.attrs()):
                 data, colors, fairness_constraints = datasets.load(dataset, 0, delta)
 
