@@ -1,4 +1,8 @@
+# UMAP uses Numba, so here we silence warnings on which we have no control
+from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
+warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
+warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 import h5py
 import polars as pl
 import pandas as pd
@@ -175,12 +179,16 @@ DATASETS = {
 }
 
 
-def load(name, color_idx, delta=0.0):
+def load(name, color_idx, delta=0.0, prefix=None):
     fname = DATASETS[name]()
     print("Opening", fname)
     with h5py.File(fname, "r") as hfp:
-        data = hfp["data"][:]
-        colors = hfp["colors"][:, color_idx]
+        if prefix is None:
+            data = hfp["data"][:]
+            colors = hfp["colors"][:, color_idx]
+        else:
+            data = hfp["data"][:prefix, :]
+            colors = hfp["colors"][:prefix, color_idx]
     unique_colors, color_counts = np.unique(colors, return_counts=True)
     color_proportion = color_counts / np.sum(color_counts)
     fairness_constraints = List([

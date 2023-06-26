@@ -3,6 +3,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+import logging
+
 
 def plot_clustering(data, centers, assignment, filename="clustering.png"):
     unique, counts = np.unique(assignment, return_counts=True)
@@ -14,10 +16,10 @@ def plot_clustering(data, centers, assignment, filename="clustering.png"):
 
     for c in cluster:
         cdata = data[assignment == c]
-        plt.scatter(cdata[:,0], cdata[:,1], s=10)
+        plt.scatter(cdata[:, 0], cdata[:, 1], s=10)
 
-    plt.scatter(data[centers,0], data[centers,1], s=200, marker="x", c="black")
+    plt.scatter(data[centers, 0], data[centers, 1],
+                s=200, marker="x", c="black")
 
     plt.tight_layout()
     plt.savefig(filename)
-
