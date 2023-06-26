@@ -24,7 +24,7 @@ class UnfairKCenter(object):
     def time(self):
         return self.elapsed
 
-    def fit_predict(self, X):
+    def fit_predict(self, X, _colors_unused, _fairness_constraints_unused):
         start = time.time()
         np.random.seed(self.seed)
 

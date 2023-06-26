@@ -42,7 +42,8 @@ def write_clustering(opath, centers, assignment, dataset, algorithm, k, delta, a
     with h5py.File(opath, mode) as hfp:
         key = compute_key(dataset, algorithm, k, delta, attrs_dict)
         if key in hfp:
-            logging.warn("Name already exists in result file, skipping: %s", key)
+            logging.warn(
+                "Name already exists in result file, skipping: %s", key)
             return
         group = hfp.create_group(key)
         group["centers"] = centers
@@ -94,30 +95,24 @@ def get_db():
 
 def already_run(dataset, algorithm, k, delta, attrs_dict):
     with get_db() as db:
+        key = compute_key(dataset, algorithm, k, delta, attrs_dict)
         res = db.execute("""
         SELECT timestamp 
         FROM results 
-        WHERE dataset = :dataset
-        AND algorithm = :algorithm
-        AND k = :k
-        AND delta = :delta
-        AND params = :params
+        WHERE hdf5_key = :key
         """, {
-            "dataset": dataset,
-            "algorithm": algorithm,
-            "k": k,
-            "delta": delta,
-            "params": json.dumps(attrs_dict, sort_keys=True)
+            "key": key
         }).fetchone()
         return res is not None
 
-    pass
 
 def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_dict, time_s, additional_metrics):
     data, colors, fairness_constraints = datasets.load(dataset, 0, delta)
     radius = assess.radius(data, centers, assignment)
-    violation = assess.additive_violations(k, colors, assignment, fairness_constraints)
-    key = write_clustering(opath, centers, assignment, dataset, algorithm, k, delta, attrs_dict)
+    violation = assess.additive_violations(
+        k, colors, assignment, fairness_constraints)
+    key = write_clustering(opath, centers, assignment,
+                           dataset, algorithm, k, delta, attrs_dict)
     print(f"{algorithm} on {dataset} (k={k}, delta={delta}): t={time_s}s r={radius} violation={violation}")
     with get_db() as db:
         db.execute("""
@@ -138,8 +133,6 @@ def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_
         })
 
 
-
-
 if __name__ == "__main__":
     import kcenter
     import datasets
@@ -147,8 +140,9 @@ if __name__ == "__main__":
     dataset = "creditcard"
     data, colors, color_proportion = datasets.load(dataset, 0)
     greedy_centers, greedy_assignment = kcenter.greedy_minimum_maximum(data, k)
-    write_clustering("results.hdf5", greedy_assignment, greedy_centers, dataset, "gmm", k, {})
-    centers, assignment = read_clustering("results.hdf5", dataset, "gmm", k, {})
+    write_clustering("results.hdf5", greedy_assignment,
+                     greedy_centers, dataset, "gmm", k, {})
+    centers, assignment = read_clustering(
+        "results.hdf5", dataset, "gmm", k, {})
     print(centers)
     print(assignment)
-
