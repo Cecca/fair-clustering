@@ -12,6 +12,12 @@ class UnfairKCenter(object):
         self.k = k
         self.seed = seed
 
+    def attrs(self):
+        return {}
+
+    def additional_metrics(self):
+        return {}
+
     def name(self):
         return "unfair-k-center"
 
@@ -47,6 +53,12 @@ class BeraEtAlKCenter(object):
     def __init__(self, k, seed=123):
         self.k = k
         self.seed = seed
+
+    def attrs(self):
+        return {}
+
+    def additional_metrics(self):
+        return {}
 
     def name(self):
         return "bera-et-al-k-center"
@@ -195,7 +207,7 @@ if __name__ == "__main__":
     delta = 0.1
     dataset = "creditcard"
     data, colors, fairness_constraints = datasets.load(
-        dataset, 0, delta, prefix=100)
+        dataset, 0, delta, prefix=10000)
 
     # Fair
     tau = k*100
