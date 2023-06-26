@@ -1,0 +1,44 @@
+---
+title: "Fair clustering experiments"
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+library(tidyverse)
+library(ggpattern)
+theme_set(theme_bw() + theme(legend.position="bottom"))
+
+load_data <- function() {
+  con <- DBI::dbConnect(RSQLite::SQLite(), "results.db")
+
+  results <- tbl(con, sql("select *, json_extract(params, '$.tau') / k as tau from results")) |> 
+    filter(delta == 0) |>
+    collect()
+
+  DBI::dbDisconnect(con)
+  results
+}
+
+results <- load_data()
+```
+
+```{r}
+results |>
+  ggplot(aes(radius, time_s, color=algorithm, shape=algorithm)) +
+  geom_point() +
+  # scale_y_log10() +
+  facet_grid(vars(dataset), vars(k))
+```
+
+```{r}
+results |>
+  mutate(tau = if_else(is.na(tau), 0, tau)) |>
+  ggplot(aes(algorithm, radius, fill=algorithm, pattern=factor(tau))) +
+  geom_col_pattern(position="dodge") +
+  facet_grid(vars(dataset), vars(k)) +
+  coord_flip()
+```
+

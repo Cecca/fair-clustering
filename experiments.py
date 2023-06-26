@@ -26,8 +26,8 @@ def evaluate(dataset, delta, algo):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     ofile = "results.hdf5"
-    ks = [2, 4, 8]
-    deltas = [0, 0.1, 0.2]
+    ks = [2, 4, 8, 16, 32]
+    deltas = [0]  # , 0.1, 0.2]
     all_datasets = ["creditcard"]  # , "diabetes", "adult"]
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         algos = [

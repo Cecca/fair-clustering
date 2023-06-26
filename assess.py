@@ -8,9 +8,11 @@ from sklearn.metrics import DistanceMetric
 import datasets
 import results
 
+
 def radius(data, centers, assignment, all=False):
     k = centers.shape[0]
-    dists = paired_distances(data, data[centers[assignment]], metric="euclidean")
+    dists = paired_distances(
+        data, data[centers[assignment]], metric="euclidean")
 
     if all:
         r = np.zeros(k)
@@ -28,7 +30,7 @@ def additive_violations(k, colors, assignment, fairness_constraints):
     counts = np.zeros((k, ncolors), dtype=np.int32)
     # Count the cluster size for each color
     for c, color in zip(assignment, colors):
-        counts[c,color] += 1
+        counts[c, color] += 1
     additive_violations = np.zeros((k, ncolors), dtype=np.int32)
     for c in range(k):
         cluster = counts[c]
@@ -36,12 +38,12 @@ def additive_violations(k, colors, assignment, fairness_constraints):
         for color in range(ncolors):
             beta, alpha = fairness_constraints[color]
             low, high = np.floor(beta * size), np.ceil(alpha * size)
-            csize = counts[c,color]
+            csize = counts[c, color]
             if csize < low:
-                additive_violations[c,color] = csize - low
+                additive_violations[c, color] = csize - low
             elif csize > high:
-                additive_violations[c,color] = csize - high
-    return np.abs(additive_violations).max()
+                additive_violations[c, color] = csize - high
+    return int(np.abs(additive_violations).max())
 
 
 if __name__ == "__main__":
@@ -54,8 +56,7 @@ if __name__ == "__main__":
         "tau": 640
     }
     data, colors, color_proportion = datasets.load(dataset, 0)
-    centers, assignment = results.read_clustering(f, dataset, algorithm, k, attrs)
+    centers, assignment = results.read_clustering(
+        f, dataset, algorithm, k, attrs)
     r = radius(data, centers, assignment, all=True)
     print(r)
-
-
