@@ -280,6 +280,8 @@ def load_pca2(name):
 def load_umap(name):
     fname = DATASETS[name]()
     with h5py.File(fname, "r") as hfp:
+        if "data-UMAP" not in hfp:
+            return None
         data = hfp["data-UMAP"][:]
     return data
 

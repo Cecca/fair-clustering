@@ -28,6 +28,8 @@ def plot_clustering(data, centers, assignment, filename="clustering.png"):
 def plot_dataset(name, filename="dataset.png"):
     import datasets
     data = datasets.load_pca2(name)
+    if data is None:
+        return
     plt.figure(figsize=(10, 10))
     plt.scatter(data[:, 0], data[:, 1])
     plt.tight_layout()
