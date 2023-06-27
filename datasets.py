@@ -171,12 +171,85 @@ def diabetes():
     return ofname
 
 
+def _kfc_csv(url, local_fname, ofname, attributes, color_columns, sep=","):
+    """
+    Download and preprocess datasets available at https://github.com/FaroukY/KFC-ScalableFairClustering
+    which is the repository for the paper
+    "KFC: A Scalable Approximation Algorithm for k−center Fair Clustering" in NeurIPS 2020.
+    """
+    if os.path.isfile(ofname):
+        return ofname
+
+    fname = download(url, local_fname)
+    df = pl.read_csv(fname, separator=sep)
+    print(df)
+    data = df.select(attributes).to_numpy()
+    data = StandardScaler().fit_transform(data)
+    encoders = dict((c, LabelEncoder()) for c in color_columns)
+    colors = df.select([
+        pl.col(column).map(lambda c: enc.fit_transform(c)).explode()
+        for column, enc in encoders.items()
+    ]).to_numpy()
+    write_hdf5(data, colors, encoders, ofname)
+    return ofname
+
+
+def four_area():
+    return _kfc_csv(
+        url = "https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/4area.csv",
+        local_fname = "data/4area.csv",
+        ofname = "data/4area.hdf5",
+        attributes = [str(c + 1) for c in range(8)],
+        color_columns = ["color"]
+    )
+
+
+def c50():
+    return _kfc_csv(
+        url = "https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/c50.csv",
+        local_fname = "data/c50.csv",
+        ofname = "data/c50.hdf5",
+        attributes = [str(c) for c in range(10)],
+        color_columns = ["color"]
+    )
+
+
+def victorian():
+    return _kfc_csv(
+        url = "https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/victorian.csv",
+        local_fname = "data/victorian.csv",
+        ofname = "data/victorian.hdf5",
+        attributes = [str(c) for c in range(10)],
+        color_columns = ["color"]
+    )
+
+
+def bank():
+    return _kfc_csv(
+        url = "https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/bank_categorized.csv",
+        local_fname = "data/bank_categorized.csv",
+        ofname = "data/bank_categorized.hdf5",
+        attributes = ["age", "balance", "duration", "job", "education", "default", "housing", "loan", "contact"],
+        color_columns = ["marital"]
+    )
+
+
 DATASETS = {
     "adult": adult,
     "diabetes": diabetes,
     "census1990": census1990,
-    "creditcard": creditcard
+    "creditcard": creditcard,
+    "4area": four_area,
+    "c50": c50,
+    "victorian": victorian,
+    "bank": bank,
 }
+
+
+def datasets():
+    """Return all dataset names"""
+    names = list(DATASETS.keys())
+    return names
 
 
 def load(name, color_idx, delta=0.0, prefix=None):

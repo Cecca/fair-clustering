@@ -23,3 +23,18 @@ def plot_clustering(data, centers, assignment, filename="clustering.png"):
 
     plt.tight_layout()
     plt.savefig(filename)
+
+
+def plot_dataset(name, filename="dataset.png"):
+    import datasets
+    data = datasets.load_pca2(name)
+    plt.figure(figsize=(10, 10))
+    plt.scatter(data[:, 0], data[:, 1])
+    plt.tight_layout()
+    plt.savefig(filename)
+
+
+if __name__ == "__main__":
+    import datasets
+    for dataset in datasets.datasets():
+        plot_dataset(dataset, f"data/{dataset}.png")
