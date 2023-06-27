@@ -9,3 +9,4 @@ experiments_files/figure-html
 experiments_files/libs
 experiments.html
 fairclustering.sif
+slurm-*.out
