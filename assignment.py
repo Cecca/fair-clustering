@@ -3,9 +3,11 @@ import logging
 from pulp import LpProblem, LpVariable, lpSum, LpStatus, LpConstraint, LpConstraintEQ, LpConstraintGE, LpConstraintLE
 from pulp.apis import COIN_CMD
 import numpy as np
+import time
 
 
 def inner_fair_assignment(R, costs, colors, fairness_constraints, integer=False):
+    t_setup_start = time.time()
     vartype = "Integer" if integer else "Continuous"
     n, k = costs.shape
     ncolors = np.max(colors) + 1
@@ -40,8 +42,14 @@ def inner_fair_assignment(R, costs, colors, fairness_constraints, integer=False)
             prob += (
                 color_cluster_size <= alpha * cluster_size
             )
+    t_setup_end = time.time()
+    logging.info("  Setup LP in %f s", t_setup_end - t_setup_start)
 
+    t_solve_start = time.time()
     prob.solve(COIN_CMD(mip=integer, msg=False))
+    t_solve_end = time.time()
+    logging.info("  Solve LP in %f s", t_solve_end - t_solve_start)
+
     if LpStatus[prob.status] == "Optimal":
         assignment = {}
         for x in range(n):
@@ -296,22 +304,32 @@ def fair_assignment(centers, costs, colors, fairness_contraints):
     allcosts = np.sort(np.unique(costs))
 
     def binary_search():
-        low, high = 0, allcosts.shape[0]
-        while low <= high:
+        def relative_difference(high, low):
+            return (allcosts[high] - allcosts[low]) / allcosts[high]
+
+        last_valid = None
+        low, high = 0, allcosts.shape[0] - 1
+        # Run while the relative difference is more than 1%
+        while last_valid is None or relative_difference(high, low) >= 0.01:
+            logging.info("Relative difference %f", relative_difference(high, low))
             mid = low + (high - low) // 2
             R = allcosts[mid]
             logging.info("R %f", R)
             assignment = inner_fair_assignment(
                 R, costs, colors, fairness_contraints)
             if low == high:
+                assert assignment is not None
                 return assignment
             if assignment is None:
                 low = mid + 1
             else:
+                last_valid = assignment
                 if low == mid:
                     return assignment
                 else:
                     high = mid
+        assert last_valid is not None
+        return last_valid
 
     assignment = binary_search()
     assignment = round_assignment(
@@ -325,8 +343,13 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints):
     allcosts = np.sort(np.unique(costs))
 
     def binary_search():
-        low, high = 0, allcosts.shape[0]
-        while low <= high:
+        def relative_difference(high, low):
+            return (allcosts[high] - allcosts[low]) / allcosts[high]
+
+        last_valid = None
+        low, high = 0, allcosts.shape[0] - 1
+        while last_valid is None or relative_difference(high, low) >= 0.01:
+            logging.info("Relative difference %f", relative_difference(high, low))
             mid = low + (high - low) // 2
             R = allcosts[mid]
             logging.info("R %f", R)
@@ -341,6 +364,8 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints):
                     return assignment
                 else:
                     high = mid
+        assert last_valid is not None
+        return last_valid
 
     wassignment = binary_search()
     assignment = weighted_round_assignment(
