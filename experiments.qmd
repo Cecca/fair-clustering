@@ -16,7 +16,15 @@ load_data <- function() {
 
   results <- tbl(con, sql("select *, json_extract(params, '$.tau') / k as tau from results")) |> 
     filter(delta == 0) |>
-    collect()
+    collect() |>
+    mutate(
+      timeout_s = if_else(time_s > 30*60, 30*60, timeout_s),
+      timed_out = !is.na(timeout_s),
+      time_s = if_else(timed_out, timeout_s, time_s)
+    ) |>
+    group_by(dataset, k) |>
+    mutate(scaled_radius = radius / min(radius)) |>
+    ungroup()
 
   DBI::dbDisconnect(con)
   results
@@ -27,18 +35,30 @@ results <- load_data()
 
 ```{r}
 results |>
-  ggplot(aes(radius, time_s, color=algorithm, shape=algorithm)) +
+  ggplot(aes(scaled_radius, time_s, color=algorithm, shape=algorithm)) +
+  geom_point(data=~ filter(., timed_out), shape=21, color="black", fill="white", size=4) +
   geom_point() +
-  # scale_y_log10() +
   facet_grid(vars(dataset), vars(k))
 ```
 
 ```{r}
-results |>
+load_data() |>
   mutate(tau = if_else(is.na(tau), 0, tau)) |>
-  ggplot(aes(algorithm, radius, fill=algorithm, pattern=factor(tau))) +
-  geom_col_pattern(position="dodge") +
-  facet_grid(vars(dataset), vars(k)) +
-  coord_flip()
+  ggplot(aes(k, radius, color=algorithm)) +
+  geom_line(data=~filter(., algorithm != "coreset-fair-k-center")) +
+  geom_point(data=~filter(., algorithm != "coreset-fair-k-center")) +
+  geom_line(
+    data=~filter(., algorithm == "coreset-fair-k-center"),
+    mapping=aes(linetype=factor(tau)),
+    stat="summary",
+    fun=mean
+  ) +
+  geom_point(
+    data=~filter(., algorithm == "coreset-fair-k-center"),
+    mapping=aes(shape=factor(tau)),
+    stat="summary",
+    fun=mean
+  ) +
+  facet_wrap(vars(dataset), scale="free_y")
 ```
 
