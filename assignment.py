@@ -244,6 +244,8 @@ def weighted_round_assignment(n, k, ncolors, input_assignment, weights):
         for c in range(k):
             if (CLUSTER_CONSTRAINT, c) in blacklist:
                 continue
+            if cluster_sizes[c] == 0:
+                continue
             cvars = [vars[x, cluster, color]
                      for (x, cluster, color) in vars if cluster == c]
             assert len(cvars) > 0
@@ -256,6 +258,8 @@ def weighted_round_assignment(n, k, ncolors, input_assignment, weights):
         for c in range(k):
             for color in range(ncolors):
                 if (COLORED_CLUSTER_CONSTRAINT, c, color) in blacklist:
+                    continue
+                if colored_cluster_sizes[c,color] == 0:
                     continue
                 cvars = [vars[x, cluster, ccolor]
                          for (x, cluster, ccolor) in vars
