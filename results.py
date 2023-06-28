@@ -81,6 +81,9 @@ def get_db():
             additional_metrics  JSON,
             hdf5_key     TEXT
         );
+        """,
+        """
+        ALTER TABLE results ADD COLUMN timeout_s REAL;
         """
     ]
     dbver = db.execute("PRAGMA user_version").fetchone()[0]
@@ -106,6 +109,30 @@ def already_run(dataset, algorithm, k, delta, attrs_dict):
         return res is not None
 
 
+def save_timeout(dataset, algorithm, k, delta, attrs_dict, timeout_s):
+    key = compute_key(dataset, algorithm, k, delta, attrs_dict)
+    with get_db() as db:
+        db.execute("""
+        INSERT INTO results VALUES (
+            DATETIME('now'), :dataset, :algorithm, :k, :delta, :params, 
+            :radius, :time_s, :additive_violation, 
+            :additional_metrics, :hdf5_key, :timeout_s
+        )
+        """, {
+            "dataset": dataset,
+            "algorithm": algorithm,
+            "k": k,
+            "delta": delta,
+            "params": json.dumps(attrs_dict, sort_keys=True),
+            "timeout_s": timeout_s,
+            "radius": None,
+            "time_s": None,
+            "additive_violation": None,
+            "additional_metrics": json.dumps({}, sort_keys=True),
+            "hdf5_key": key
+        })
+
+
 def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_dict, time_s, additional_metrics):
     data, colors, fairness_constraints = datasets.load(dataset, 0, delta)
     radius = assess.radius(data, centers, assignment)
@@ -117,7 +144,9 @@ def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_
     with get_db() as db:
         db.execute("""
         INSERT INTO results VALUES (
-            DATETIME('now'), :dataset, :algorithm, :k, :delta, :params, :radius, :time_s, :additive_violation, :additional_metrics, :hdf5_key
+            DATETIME('now'), :dataset, :algorithm, :k, :delta, :params, 
+            :radius, :time_s, :additive_violation, 
+            :additional_metrics, :hdf5_key, :timeout_s
         )
         """, {
             "dataset": dataset,
@@ -127,6 +156,7 @@ def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_
             "params": json.dumps(attrs_dict, sort_keys=True),
             "radius": radius,
             "time_s": time_s,
+            "timeout_s": None,
             "additive_violation": violation,
             "additional_metrics": json.dumps(additional_metrics, sort_keys=True),
             "hdf5_key": key
