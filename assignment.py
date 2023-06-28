@@ -271,9 +271,6 @@ def weighted_round_assignment(n, k, ncolors, input_assignment, weights):
                                    f"upper_csize_{c}_{color}",
                                    np.ceil(colored_cluster_sizes[c, color]))
 
-        # for c in lp.constraints.items():
-        #     print(c)
-        lp.writeLP("/tmp/lp.lp")
         return lp, vars
 
     output_assignment = np.zeros((n, k, ncolors))
@@ -287,15 +284,12 @@ def weighted_round_assignment(n, k, ncolors, input_assignment, weights):
     for (x, c, color) in input_assignment:
         z = input_assignment[x, c, color]
         check[x, color] += z
-        # print((x, c, color), z)
         floor = np.floor(z)
         output_assignment[x, c, color] = int(floor)
         weights[x, color] -= floor
         if z != floor:
             cluster_sizes[c] += z - floor
             colored_cluster_sizes[c, color] += z - floor
-    print(weights)
-    # assert np.all(orig_weights == check)
 
     point_ids = dict(((x, color), weights[x, color])
                      for x in range(n)
@@ -336,7 +330,7 @@ def weighted_round_assignment(n, k, ncolors, input_assignment, weights):
                 if color_residual[c, color] <= 3:
                     blacklist.add((COLORED_CLUSTER_CONSTRAINT, c, color))
 
-    print("total output weight", np.sum(output_assignment))
+    logging.info("total output weight %f", np.sum(output_assignment))
     assert np.sum(output_assignment) == np.sum(orig_weights)
 
     return output_assignment
