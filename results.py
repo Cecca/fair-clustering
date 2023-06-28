@@ -163,16 +163,33 @@ def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_
         })
 
 
+def garbage_collect(hdf5_path):
+    def list_keys(obj):
+        if isinstance(obj, h5py.Group):
+            for k in obj.keys():
+                if isinstance(obj[k], h5py.Group):
+                    yielded = 0
+                    for sub in list_keys(obj[k]):
+                        if len(sub) > 0:
+                            yielded += 1
+                            yield f"{k}/{sub}"
+                    if yielded == 0:
+                        yield k
+                else:
+                    yield ""
+        else:
+            yield ""
+
+    with get_db() as db:
+        with h5py.File(hdf5_path, "r+") as hfp:
+            keys = list(list_keys(hfp))
+            for k in keys:
+                cnt, = db.execute("SELECT COUNT(*) FROM results WHERE hdf5_key = ?", [k]).fetchone()
+                if cnt == 0:
+                    logging.info("Removing %s from the hdf5 file", k)
+                    del hfp[k]
+
+
 if __name__ == "__main__":
-    import kcenter
-    import datasets
-    k = 64
-    dataset = "creditcard"
-    data, colors, color_proportion = datasets.load(dataset, 0)
-    greedy_centers, greedy_assignment = kcenter.greedy_minimum_maximum(data, k)
-    write_clustering("results.hdf5", greedy_assignment,
-                     greedy_centers, dataset, "gmm", k, {})
-    centers, assignment = read_clustering(
-        "results.hdf5", dataset, "gmm", k, {})
-    print(centers)
-    print(assignment)
+    logging.basicConfig(level=logging.INFO)
+    garbage_collect("results.hdf5")

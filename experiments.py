@@ -51,8 +51,9 @@ if __name__ == "__main__":
             kcenter.UnfairKCenter(k),
             kcenter.BeraEtAlKCenter(k),
         ] + [
-            kcenter.CoresetFairKCenter(k, tau, integer_programming=False)
-            for tau in [2*k, 8*k]
+            kcenter.CoresetFairKCenter(k, tau, seed=seed, integer_programming=False)
+            for tau in [2*k, 8*k, 32*k, 64*k, 128*k]
+            for seed in range(1, 5)
         ]
         for algo in algos:
             evaluate(dataset, delta, algo)

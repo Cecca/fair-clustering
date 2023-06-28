@@ -132,13 +132,18 @@ class CoresetFairKCenter(object):
         }
 
     def additional_metrics(self):
+        import assess
+        coreset_radius = assess.radius(self.data, self.coreset_points_ids, self.proxy)
+        logging.info("Coreset radius %f", coreset_radius)
         return {
             "time_coreset_s": self.time_coreset_s,
-            "time_assignment_s": self.time_assignment_s
+            "time_assignment_s": self.time_assignment_s,
+            "coreset_radius": coreset_radius
         }
 
     def fit_predict(self, X, colors, fairness_constraints):
         # Step 1. Build the coreset
+        self.data = X
         start = time.time()
         coreset_ids, coreset, proxy, weights = self.build_coreset(
             X, self.tau, colors)
@@ -166,6 +171,8 @@ class CoresetFairKCenter(object):
 
     def build_coreset(self, data, tau, colors):
         point_ids, proxy = greedy_minimum_maximum(data, tau, seed=self.seed)
+        self.coreset_points_ids = point_ids
+        self.proxy = proxy
         ncolors = np.max(colors) + 1
         coreset_points = data[point_ids]
         coreset_weights = np.zeros(
@@ -203,18 +210,19 @@ if __name__ == "__main__":
     import assess
     logging.basicConfig(level=logging.INFO)
 
-    k = 8
+    k = 32
     delta = 0.1
-    dataset = "reuter_50_50"
+    dataset = "adult"
     # dataset = "creditcard"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta, prefix=10000)
 
     # Fair
-    tau = k*10
+    tau = k*32
     algo = CoresetFairKCenter(k, tau)
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
     print(assignment)
     print("radius", assess.radius(data, centers, assignment))
+    print(algo.additional_metrics())
     viz.plot_clustering(data, centers, assignment, "clustering.png")
