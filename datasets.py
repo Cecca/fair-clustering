@@ -240,7 +240,7 @@ DATASETS = {
     "census1990": census1990,
     "creditcard": creditcard,
     "4area": four_area,
-    "reuters_50_50": c50,
+    "reuter_50_50": c50,
     "victorian": victorian,
     "bank": bank,
 }

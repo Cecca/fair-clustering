@@ -186,14 +186,14 @@ class CoresetFairKCenter(object):
             else:
                 # look for the first cluster with budget for that color
                 for c in range(k):
-                    if (p, c, color) in coreset_assignment:
-                        if coreset_assignment[p, c, color] > 0:
-                            candidates = [i for i in range(
-                                k) if centers[i] == coreset_ids[coreset_centers[c]]]
-                            assert len(candidates) == 1
-                            assignment[x] = candidates[0]
-                            coreset_assignment[p, c, color] -= 1
-                            break
+                    # if (p, c, color) in coreset_assignment:
+                    if coreset_assignment[p, c, color] > 0:
+                        candidates = [i for i in range(
+                            k) if centers[i] == coreset_ids[coreset_centers[c]]]
+                        assert len(candidates) == 1
+                        assignment[x] = candidates[0]
+                        coreset_assignment[p, c, color] -= 1
+                        break
         assert assignment.max() <= k, "there are some unassigned points!"
         return centers, assignment
 
@@ -205,13 +205,14 @@ if __name__ == "__main__":
 
     k = 8
     delta = 0.1
-    dataset = "creditcard"
+    dataset = "reuter_50_50"
+    # dataset = "creditcard"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta, prefix=10000)
 
     # Fair
-    tau = k*100
-    algo = BeraEtAlKCenter(k)
+    tau = k*10
+    algo = CoresetFairKCenter(k, tau)
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
     print(assignment)
