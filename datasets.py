@@ -14,6 +14,7 @@ from numba.typed import List
 import requests
 import os
 import zipfile
+import logging
 
 
 def download(url, local_filename=None):
@@ -254,7 +255,7 @@ def datasets():
 
 def load(name, color_idx, delta=0.0, prefix=None):
     fname = DATASETS[name]()
-    print("Opening", fname)
+    logging.debug("Opening %s", fname)
     with h5py.File(fname, "r") as hfp:
         if prefix is None:
             data = hfp["data"][:]
@@ -270,6 +271,11 @@ def load(name, color_idx, delta=0.0, prefix=None):
     ])
     return data, colors, fairness_constraints
 
+def dataset_size(name):
+    fname = DATASETS[name]()
+    logging.debug("Opening %s", fname)
+    with h5py.File(fname, "r") as hfp:
+        return hfp["data"].shape
 
 def load_pca2(name):
     fname = DATASETS[name]()

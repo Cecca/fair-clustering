@@ -223,26 +223,28 @@ def round_assignment(n, k, ncolors, input_assignment, colors):
     return output_assignment
 
 
-def weighted_round_assignment(n, k, ncolors, input_assignment, weights):
+def weighted_round_assignment(R, n, k, ncolors, costs, input_assignment, weights):
     VARIABLE = 0
     CLUSTER_CONSTRAINT = 1
     COLORED_CLUSTER_CONSTRAINT = 2
 
     def _setup_lp(point_ids, weights, cluster_sizes, colored_cluster_sizes, blacklist):
+        print("total weight to assign ", np.sum(weights))
         lp = LpProblem()
 
         # 1. set up the variables
         vars = {}
         for (x, color) in point_ids:
             for c in range(k):
-                if (x,c,color) in input_assignment and (VARIABLE, x, c, color) not in blacklist:
+                if costs[x,c] <= R and weights[x,color] > 0 and (VARIABLE, x,c,color) not in blacklist:
                     vars[x, c, color] = LpVariable(
                         f"z_{x}_{c}_{color}", 0, 1)
         # 2. add constraints on the assignment to clusters
         for (x, color) in point_ids:
-            lp += LpConstraint(lpSum([vars[x, c, color]
-                                      for c in range(k)
-                                      if (x, c, color) in vars]),
+            pvars = [vars[x, c, color]
+                     for c in range(k)
+                     if (x, c, color) in vars]
+            lp += LpConstraint(lpSum(pvars),
                                LpConstraintEQ,
                                f"assign_{x}_{color}",
                                weights[x, color])
@@ -250,11 +252,8 @@ def weighted_round_assignment(n, k, ncolors, input_assignment, weights):
         for c in range(k):
             if (CLUSTER_CONSTRAINT, c) in blacklist:
                 continue
-            if cluster_sizes[c] == 0:
-                continue
             cvars = [vars[x, cluster, color]
                      for (x, cluster, color) in vars if cluster == c]
-            assert len(cvars) > 0
             csize = lpSum(cvars)
             lp += LpConstraint(csize, LpConstraintGE, f"lower_csize_{c}",
                                np.floor(cluster_sizes[c]))
@@ -265,12 +264,10 @@ def weighted_round_assignment(n, k, ncolors, input_assignment, weights):
             for color in range(ncolors):
                 if (COLORED_CLUSTER_CONSTRAINT, c, color) in blacklist:
                     continue
-                if colored_cluster_sizes[c,color] == 0:
-                    continue
                 cvars = [vars[x, cluster, ccolor]
                          for (x, cluster, ccolor) in vars
                          if cluster == c and ccolor == color]
-                assert len(cvars) > 0
+                logging.debug("c=%d, color=%d, len(cvars) = %d, colored_cluster_size = %d", c, color, len(cvars), colored_cluster_sizes[c,color])
                 csize = lpSum(cvars)
                 lp += LpConstraint(csize,
                                    LpConstraintGE,
@@ -301,14 +298,13 @@ def weighted_round_assignment(n, k, ncolors, input_assignment, weights):
             cluster_sizes[c] += z - floor
             colored_cluster_sizes[c, color] += z - floor
 
-    point_ids = dict(((x, color), weights[x, color])
+    point_ids = set((x, color)
                      for x in range(n)
                      for color in range(ncolors)
                      if weights[x, color] > 0)
     blacklist = set()
 
-    while len(point_ids) > 0:
-        logging.info("still to assign %d", len(point_ids))
+    while np.sum(weights) > 0:
         lp, vars = _setup_lp(point_ids,
                              weights,
                              cluster_sizes,
@@ -322,12 +318,11 @@ def weighted_round_assignment(n, k, ncolors, input_assignment, weights):
         color_residual = np.zeros((k, ncolors))
         for (x, c, color), v in vars.items():
             if v.value() == 1:
+                logging.debug("assign %d (color %d) to center %d", x, color, c)
                 output_assignment[x, c, color] += 1
                 cluster_sizes[c] -= 1
                 colored_cluster_sizes[c, color] -= 1
-                point_ids[x, color] -= 1
-                if point_ids[x, color] == 0:
-                    del point_ids[x, color]
+                weights[x, color] -= 1
             elif v.value() == 0:
                 blacklist.add((VARIABLE, x, c, color))
             else:
@@ -431,26 +426,27 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints):
             assignment = inner_weighted_fair_assignment(
                 R, costs, weights, fairness_contraints)
             if low == high:
-                return assignment
+                return assignment, R
             if assignment is None:
                 low = mid + 1
             else:
                 last_valid = assignment
+                last_R = R
                 if low == mid:
-                    return assignment
+                    return assignment, R
                 else:
                     high = mid
         assert last_valid is not None
         logging.info("returning last_valid with total weight %.10f",
                      sum(last_valid.values()))
-        return last_valid
+        return last_valid, last_R
 
-    wassignment = binary_search()
+    wassignment, R = binary_search()
     fradius = _weighted_assignment_radius(costs, centers, wassignment)
     logging.info("Radius of the fractional weight assignment %f", fradius)
 
     assignment = weighted_round_assignment(
-        n, k, ncolors, wassignment, weights)
+        R, n, k, ncolors, costs, wassignment, weights)
     radius = _weighted_assignment_radius(costs, centers, assignment)
     logging.info("Radius of the weight assignment after rounding %f", radius)
     assert radius <= fradius

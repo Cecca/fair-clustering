@@ -142,6 +142,7 @@ class CoresetFairKCenter(object):
         }
 
     def fit_predict(self, X, colors, fairness_constraints):
+        assert self.tau <= X.shape[0], f"Tau larger than number of points {self.tau} > {X.shape[0]}"
         # Step 1. Build the coreset
         self.data = X
         start = time.time()
@@ -210,19 +211,18 @@ if __name__ == "__main__":
     import assess
     logging.basicConfig(level=logging.INFO)
 
-    k = 32
-    delta = 0.1
-    dataset = "adult"
-    # dataset = "creditcard"
+    k = 16
+    delta = 0.0
+    dataset = "4area"
     data, colors, fairness_constraints = datasets.load(
-        dataset, 0, delta, prefix=10000)
+        dataset, 0, delta)
 
     # Fair
-    tau = k*32
-    algo = CoresetFairKCenter(k, tau)
+    tau = 1024
+    algo = CoresetFairKCenter(k, tau, seed=2)
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
-    print(assignment)
     print("radius", assess.radius(data, centers, assignment))
+    print("violation", assess.additive_violations(k, colors, assignment, fairness_constraints))
     print(algo.additional_metrics())
-    viz.plot_clustering(data, centers, assignment, "clustering.png")
+    # viz.plot_clustering(data, centers, assignment, "clustering.png")

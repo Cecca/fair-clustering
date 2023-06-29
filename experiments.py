@@ -20,7 +20,7 @@ def timeout_handler(signum, frame):
 def evaluate(dataset, delta, algo):
     if results.already_run(dataset, algo.name(), k, delta, algo.attrs()):
         return
-    logging.info(f"Running {algo.name()} on {dataset} for k={k}")
+    logging.info(f"Running {algo.name()} with {algo.attrs()} on {dataset} for k={k}")
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
 
@@ -47,6 +47,7 @@ if __name__ == "__main__":
     deltas = [0]  # , 0.1, 0.2]
     all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
+        n, dim = datasets.dataset_size(dataset)
         algos = [
             kcenter.UnfairKCenter(k),
             kcenter.BeraEtAlKCenter(k),
@@ -54,6 +55,7 @@ if __name__ == "__main__":
             kcenter.CoresetFairKCenter(k, tau, seed=seed, integer_programming=False)
             for tau in [2*k, 8*k, 32*k, 64*k, 128*k]
             for seed in range(1, 5)
+            if tau <= n
         ]
         for algo in algos:
             evaluate(dataset, delta, algo)
