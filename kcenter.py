@@ -85,9 +85,9 @@ class BeraEtAlKCenter(object):
         return self.assignment
 
 
-def greedy_minimum_maximum(data, k, return_assignment=True, seed=123):
+def greedy_minimum_maximum(data, k, return_assignment=True, seed=123, p=None):
     np.random.seed(seed)
-    centers = [np.random.choice(data.shape[0])]
+    centers = [np.random.choice(data.shape[0], p=p)]
     distances = pairwise_distances(data, data[centers[-1]].reshape(1, -1))
     while len(centers) < k:
         farthest = np.argmax(distances)
@@ -151,8 +151,10 @@ class CoresetFairKCenter(object):
         self.time_coreset_s = time.time() - start
 
         # Step 2. Find the greedy centers in the coreset
+        selection_probabilities = np.sum(weights, axis=1).astype(np.float64)
+        selection_probabilities /= np.sum(selection_probabilities)
         centers = greedy_minimum_maximum(
-            coreset, self.k, return_assignment=False)
+            coreset, self.k, return_assignment=False, p=selection_probabilities)
         costs = pairwise_distances(coreset, coreset[centers])
 
         # Step 3. Find a fair assignment with the centers in the coreset
@@ -220,6 +222,7 @@ if __name__ == "__main__":
     # Fair
     tau = 1024
     algo = CoresetFairKCenter(k, tau, seed=2)
+    # algo = UnfairKCenter(k)
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
     print("radius", assess.radius(data, centers, assignment))
