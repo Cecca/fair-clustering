@@ -11,16 +11,23 @@ library(tidyverse)
 library(ggpattern)
 theme_set(theme_bw() + theme(legend.position="bottom"))
 
+imgdir <- "imgs"
+
+imgpath <- function(key) {
+  str_c(imgdir, key, "clustering.png", sep="/")
+}
+
 load_data <- function() {
   con <- DBI::dbConnect(RSQLite::SQLite(), "results.db")
 
-  results <- tbl(con, sql("select *, json_extract(params, '$.tau') / k as tau from results")) |> 
+  results <- tbl(con, sql("select *, json_extract(params, '$.tau') / k as tau, cast(additional_metrics -> '$.coreset_radius' as real) as coreset_radius from results")) |> 
     filter(delta == 0) |>
     collect() |>
     mutate(
       timeout_s = if_else(time_s > 30*60, 30*60, timeout_s),
       timed_out = !is.na(timeout_s),
-      time_s = if_else(timed_out, timeout_s, time_s)
+      time_s = if_else(timed_out, timeout_s, time_s),
+      img_path = imgpath(hdf5_key)
     ) |>
     group_by(dataset, k) |>
     mutate(scaled_radius = radius / min(radius)) |>
@@ -60,5 +67,12 @@ load_data() |>
     fun=mean
   ) +
   facet_wrap(vars(dataset), scale="free_y")
+```
+
+```{r}
+load_data() |>
+  ggplot(aes(tau, coreset_radius, color=factor(k))) +
+  geom_line(data=~drop_na(., coreset_radius)) +
+  facet_grid(vars(dataset), vars(factor(k)), scales="free")
 ```
 

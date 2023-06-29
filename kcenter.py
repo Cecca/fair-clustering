@@ -133,7 +133,8 @@ class CoresetFairKCenter(object):
 
     def additional_metrics(self):
         import assess
-        coreset_radius = assess.radius(self.data, self.coreset_points_ids, self.proxy)
+        coreset_radius = assess.radius(
+            self.data, self.coreset_points_ids, self.proxy)
         logging.info("Coreset radius %f", coreset_radius)
         return {
             "time_coreset_s": self.time_coreset_s,
@@ -142,7 +143,8 @@ class CoresetFairKCenter(object):
         }
 
     def fit_predict(self, X, colors, fairness_constraints):
-        assert self.tau <= X.shape[0], f"Tau larger than number of points {self.tau} > {X.shape[0]}"
+        assert self.tau <= X.shape[
+            0], f"Tau larger than number of points {self.tau} > {X.shape[0]}"
         # Step 1. Build the coreset
         self.data = X
         start = time.time()
@@ -151,11 +153,14 @@ class CoresetFairKCenter(object):
         self.time_coreset_s = time.time() - start
 
         # Step 2. Find the greedy centers in the coreset
-        selection_probabilities = np.sum(weights, axis=1).astype(np.float64)
-        selection_probabilities /= np.sum(selection_probabilities)
-        centers = greedy_minimum_maximum(
-            coreset, self.k, return_assignment=False, p=selection_probabilities)
+        # selection_probabilities = np.sum(weights, axis=1).astype(np.float64)
+        # selection_probabilities /= np.sum(selection_probabilities)
+        centers, assignment = greedy_minimum_maximum(
+            coreset, self.k, return_assignment=True, p=None)
         costs = pairwise_distances(coreset, coreset[centers])
+
+        # viz.plot_clustering(datasets.load_pca2("4area")[coreset_ids], centers, assignment,
+        #                     filename="coreset-clustering.png")
 
         # Step 3. Find a fair assignment with the centers in the coreset
         coreset_centers, coreset_assignment = weighted_fair_assignment(
@@ -213,19 +218,30 @@ if __name__ == "__main__":
     import assess
     logging.basicConfig(level=logging.INFO)
 
-    k = 16
+    k = 2
     delta = 0.0
     dataset = "4area"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
 
     # Fair
-    tau = 1024
+    print("Coreset ==============")
+    tau = 4096
     algo = CoresetFairKCenter(k, tau, seed=2)
-    # algo = UnfairKCenter(k)
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
     print("radius", assess.radius(data, centers, assignment))
-    print("violation", assess.additive_violations(k, colors, assignment, fairness_constraints))
+    print("violation", assess.additive_violations(
+        k, colors, assignment, fairness_constraints))
     print(algo.additional_metrics())
-    # viz.plot_clustering(data, centers, assignment, "clustering.png")
+    viz.plot_clustering(data, centers, assignment, filename="clustering.png")
+
+    # Greedy
+    print("Greedy ==============")
+    algo = UnfairKCenter(k)
+    assignment = algo.fit_predict(data, colors, fairness_constraints)
+    centers = algo.centers
+    print("radius", assess.radius(data, centers, assignment))
+    print("violation", assess.additive_violations(
+        k, colors, assignment, fairness_constraints))
+    viz.plot_clustering(data, centers, assignment, filename="greedy.png")

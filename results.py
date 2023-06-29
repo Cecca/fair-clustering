@@ -64,6 +64,17 @@ def read_clustering(opath, dataset, algorithm, k, attrs_dict):
         return centers, assignment
 
 
+def read_key(path, key):
+    with h5py.File(path, "r") as hfp:
+        if key not in hfp:
+            logging.error("Name missing in result file: %s", key)
+            raise Exception("Name missing in result file")
+        centers = hfp[f"{key}/centers"][:]
+        assignment = hfp[f"{key}/assignment"][:]
+        dataset = key.split("/")[0]
+        return centers, assignment, dataset
+
+
 def get_db():
     db = sqlite3.connect("results.db")
     migrations = [
@@ -163,6 +174,27 @@ def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_
         })
 
 
+def list_keys(hdf5_path):
+    def inner(obj):
+        if isinstance(obj, h5py.Group):
+            for k in obj.keys():
+                if isinstance(obj[k], h5py.Group):
+                    yielded = 0
+                    for sub in inner(obj[k]):
+                        if len(sub) > 0:
+                            yielded += 1
+                            yield f"{k}/{sub}"
+                    if yielded == 0:
+                        yield k
+                else:
+                    yield ""
+        else:
+            yield ""
+
+    with h5py.File(hdf5_path, "r+") as hfp:
+        return list(inner(hfp))
+
+
 def garbage_collect(hdf5_path):
     def list_keys(obj):
         if isinstance(obj, h5py.Group):
@@ -184,7 +216,8 @@ def garbage_collect(hdf5_path):
         with h5py.File(hdf5_path, "r+") as hfp:
             keys = list(list_keys(hfp))
             for k in keys:
-                cnt, = db.execute("SELECT COUNT(*) FROM results WHERE hdf5_key = ?", [k]).fetchone()
+                cnt, = db.execute(
+                    "SELECT COUNT(*) FROM results WHERE hdf5_key = ?", [k]).fetchone()
                 if cnt == 0:
                     logging.info("Removing %s from the hdf5 file", k)
                     del hfp[k]
