@@ -41,6 +41,10 @@ results <- load_data()
 ```
 
 ```{r}
+#| column: screen
+#| out-width: "100%"
+#| fig-width: 15
+#| fig-height: 15
 results |>
   ggplot(aes(scaled_radius, time_s, color=algorithm, shape=algorithm)) +
   geom_point(data=~ filter(., timed_out), shape=21, color="black", fill="white", size=4) +
@@ -74,6 +78,22 @@ load_data() |>
 load_data() |>
   ggplot(aes(tau, coreset_radius, color=factor(k))) +
   geom_line(data=~drop_na(., coreset_radius)) +
+  facet_grid(vars(dataset), vars(factor(k)), scales="free")
+```
+
+```{r}
+#| column: screen
+#| out-width: "100%"
+#| fig-width: 15
+#| fig-height: 15
+load_data() |>
+  ggplot(aes(tau, scaled_radius, color=factor(k))) +
+  geom_line(data=~drop_na(., coreset_radius), stat="summary") +
+  geom_hline(
+    aes(yintercept = scaled_radius),
+    data=~filter(., algorithm == "bera-et-al-k-center"), 
+    color="black"
+  ) +
   facet_grid(vars(dataset), vars(factor(k)), scales="free")
 ```
 
