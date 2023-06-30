@@ -66,6 +66,7 @@ load_data() |>
     stat="summary",
     fun=mean
   ) +
+  scale_y_continuous(limits=c(0,NA)) +
   facet_wrap(vars(dataset), scale="free_y")
 ```
 

@@ -227,7 +227,8 @@ if __name__ == "__main__":
     # Fair
     print("Coreset ==============")
     tau = 4096
-    algo = CoresetFairKCenter(k, tau, seed=2)
+    # algo = CoresetFairKCenter(k, tau, seed=2)
+    algo = BeraEtAlKCenter(k, seed=2)
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
     print("radius", assess.radius(data, centers, assignment))
