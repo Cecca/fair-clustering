@@ -1,0 +1,233 @@
+
+Log for '/tmp/a55fc43c21424a05935735c2a05f08e3-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:14:56 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 507 rows and 376 columns.
+Aggregator did 33 substitutions.
+Reduced LP has 1103 rows, 4055 columns, and 163224 nonzeros.
+Presolve time = 0.06 sec. (217.61 ticks)
+
+Iteration log . . .
+Iteration:     1    Scaled infeas =             5.818776
+Iteration:   105    Scaled infeas =             1.959182
+Iteration:   237    Scaled infeas =             0.979590
+Advanced basis not built.
+
+Dual simplex solved model.
+
+
+Log for '/tmp/6d96c30d5faa44cb8746476a275531d1-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:14:57 2023
+
+Row '_C150' infeasible, all entries at implied bounds.
+Presolve time = 0.01 sec. (6.29 ticks)
+
+Log for '/tmp/250cead9fef34cf2800cbf7880b6e2c2-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:14:58 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 560 rows and 584 columns.
+Aggregator did 67 substitutions.
+Reduced LP has 1081 rows, 3690 columns, and 143623 nonzeros.
+Presolve time = 0.05 sec. (190.94 ticks)
+
+Iteration log . . .
+Iteration:     1    Scaled infeas =             4.877551
+Iteration:   121    Scaled infeas =             1.959184
+
+Dual simplex solved model.
+
+
+Log for '/tmp/e6e52d5c3a70496fa920a7c35a41ac3c-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:15:00 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 566 rows and 980 columns.
+Aggregator did 155 substitutions.
+Reduced LP has 1004 rows, 3015 columns, and 158959 nonzeros.
+Presolve time = 0.04 sec. (57.10 ticks)
+Symmetry aggregator did 650 additional substitutions.
+
+Iteration log . . .
+Iteration:     1    Scaled infeas =            13.203610
+Iteration:   136    Scaled infeas =             4.390609
+Switched to devex.
+
+Primal crossover.
+  Primal:  Fixing 83 variables.
+       82 PMoves:  Infeasibility  9.62724345e-12  Objective  0.00000000e+00
+        0 PMoves:  Infeasibility  1.00812136e-11  Objective  0.00000000e+00
+  Primal:  Pushed 80, exchanged 3.
+  Dual:  Fixed no variables.
+Switched to devex.
+
+Dual simplex solved model.
+
+
+Log for '/tmp/05c59df831f94416bc91a5f91e2e9091-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:15:16 2023
+
+Row '_C102' infeasible, all entries at implied bounds.
+Presolve time = 0.02 sec. (23.64 ticks)
+
+Log for '/tmp/8584fa1f10444f848c34aadd9e7b9769-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:15:18 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 865 rows and 1 columns.
+Reduced LP has 1144 rows, 5592 columns, and 259757 nonzeros.
+Presolve time = 0.09 sec. (226.36 ticks)
+
+Dual simplex solved model.
+
+
+Log for '/tmp/6bf254f1ae7b48b6a6bed8d8facf8f1d-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:15:25 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 914 rows and 569 columns.
+Reduced LP has 1949 rows, 14651 columns, and 670810 nonzeros.
+Presolve time = 0.38 sec. (736.84 ticks)
+
+Iteration log . . .
+Iteration:     1    Scaled infeas =          1523.230508
+Iteration:   253    Scaled infeas =           750.104938
+Iteration:   460    Scaled infeas =           488.511597
+Iteration:   638    Scaled infeas =           338.621805
+
+Dual simplex solved model.
+
+
+Log for '/tmp/6b71ea216197498699eb6448b96069e8-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:15:35 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 1051 rows and 3088 columns.
+Aggregator did 2 substitutions.
+Reduced LP has 2215 rows, 14068 columns, and 717566 nonzeros.
+Presolve time = 0.18 sec. (221.32 ticks)
+Symmetry aggregator did 3577 additional substitutions.
+
+Iteration log . . .
+Iteration:     1    Scaled infeas =           668.397155
+Iteration:   206    Scaled infeas =           423.952637
+Iteration:   398    Scaled infeas =           312.833681
+Iteration:   581    Scaled infeas =           238.191929
+Iteration:   772    Scaled infeas =           167.012685
+Iteration:   962    Scaled infeas =           121.754300
+Iteration:  1184    Scaled infeas =            90.450373
+
+Dual simplex solved model.
+
+
+Log for '/tmp/e9d639d4bd45457aaa3c5f6bb9f51e1f-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:15:44 2023
+
+Infeasibility row '_C3227':  0  = 1.
+Presolve time = 0.04 sec. (33.26 ticks)
+
+Log for '/tmp/467fb5403c994a7c86f18e4cc6f365c4-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:15:52 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 1051 rows and 2775 columns.
+Aggregator did 4 substitutions.
+Reduced LP has 2266 rows, 13837 columns, and 705883 nonzeros.
+Presolve time = 0.25 sec. (218.18 ticks)
+Symmetry aggregator did 3229 additional substitutions.
+
+Iteration log . . .
+Iteration:     1    Scaled infeas =           726.498776
+Iteration:   211    Scaled infeas =           451.735338
+Iteration:   395    Scaled infeas =           312.079920
+Iteration:   587    Scaled infeas =           217.773628
+Iteration:   774    Scaled infeas =           144.411459
+Iteration:  1002    Scaled infeas =           106.226270
+
+Dual simplex solved model.
+
+
+Log for '/tmp/f5dd28edfeb54f049d642f615d6eb9bd-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:24:46 2023
+
+Row '_C102' infeasible, all entries at implied bounds.
+Presolve time = 0.02 sec. (23.64 ticks)
+
+Log for '/tmp/7399a1c7fcfd485588943c2a58e20022-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:24:49 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 865 rows and 1 columns.
+Reduced LP has 1144 rows, 5592 columns, and 259757 nonzeros.
+Presolve time = 0.11 sec. (226.36 ticks)
+
+Dual simplex solved model.
+
+
+Log for '/tmp/ec2f7d1ee8284dd3adff48ea37d9fef4-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:25:41 2023
+
+Row '_C102' infeasible, all entries at implied bounds.
+Presolve time = 0.02 sec. (23.64 ticks)
+
+Log for '/tmp/bda798ae3c234c4d9dfb986f930d7b86-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:25:43 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 865 rows and 1 columns.
+Reduced LP has 1144 rows, 5592 columns, and 259757 nonzeros.
+Presolve time = 0.10 sec. (226.36 ticks)
+
+Dual simplex solved model.
+
+
+Log for '/tmp/30003e19b11244168e7b5b9afe9d263f-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:25:50 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 914 rows and 569 columns.
+Reduced LP has 1949 rows, 14651 columns, and 670810 nonzeros.
+Presolve time = 0.32 sec. (736.84 ticks)
+
+Iteration log . . .
+Iteration:     1    Scaled infeas =          1523.230508
+Iteration:   253    Scaled infeas =           750.104938
+
+Dual simplex solved model.
+
+
+Log for '/tmp/af9054f5ad23410d8b2467917a790f9a-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:45:08 2023
+
+Row '_C102' infeasible, all entries at implied bounds.
+Presolve time = 0.03 sec. (23.64 ticks)
+
+Log for '/tmp/1a45d82d519247d6992b33435afcb7ce-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:45:26 2023
+
+Row '_C102' infeasible, all entries at implied bounds.
+Presolve time = 0.03 sec. (23.64 ticks)
+
+Log for '/tmp/4813fb8300754569ac153a03adf92410-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:45:28 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 865 rows and 1 columns.
+Reduced LP has 1144 rows, 5592 columns, and 259757 nonzeros.
+Presolve time = 0.10 sec. (226.36 ticks)
+
+Dual simplex solved model.
+
+
+Log for '/tmp/1b6861384d2f4e3586f7e5e115882dc6-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:57:01 2023
+
+Row '_C102' infeasible, all entries at implied bounds.
+Presolve time = 0.03 sec. (23.64 ticks)
+
+Log for '/tmp/1aee169aaa7f41789053f12de632c5e5-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:57:04 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 865 rows and 1 columns.
+Reduced LP has 1144 rows, 5592 columns, and 259757 nonzeros.
+Presolve time = 0.12 sec. (226.36 ticks)
+
+Dual simplex solved model.
+
+
+Log for '/tmp/fb16c00033394e16b225da7440df27c9-pulp.lp' Clone_2 (V22.1.1.0) Mon Jul  3 10:57:13 2023
+
+Tried aggregator 1 time.
+LP Presolve eliminated 914 rows and 569 columns.
+Reduced LP has 1949 rows, 14651 columns, and 670810 nonzeros.
+Presolve time = 0.39 sec. (736.84 ticks)
+
+Iteration log . . .
+Iteration:     1    Scaled infeas =          1523.230508
+Iteration:   253    Scaled infeas =           750.104938
+Iteration:   460    Scaled infeas =           488.511597
+
+Dual simplex solved model.
+

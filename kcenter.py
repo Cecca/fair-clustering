@@ -216,19 +216,23 @@ class CoresetFairKCenter(object):
 if __name__ == "__main__":
     import viz
     import assess
+    from baseline.adapter import KFC
     logging.basicConfig(level=logging.INFO)
 
-    k = 2
+    cplex_path = "/home/matteo/opt/cplex/cplex/bin/x86-64_linux/cplex"
+
+    k = 16
     delta = 0.0
-    dataset = "4area"
+    dataset = "reuter_50_50"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
 
     # Fair
-    print("Coreset ==============")
     tau = 4096
     # algo = CoresetFairKCenter(k, tau, seed=2)
-    algo = BeraEtAlKCenter(k, seed=2)
+    algo = KFC(k, cplex_path, seed=2)
+    # algo = BeraEtAlKCenter(k, seed=2)
+    print(f"{algo.name()} ==============")
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
     print("radius", assess.radius(data, centers, assignment))

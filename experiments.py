@@ -1,9 +1,11 @@
+import sys
 import kcenter
 import results
 import datasets
 import itertools
 import logging
 import signal
+import baseline
 
 TIMEOUT_SECS = 30*60
 
@@ -43,6 +45,11 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     signal.signal(signal.SIGALRM, timeout_handler)
 
+    if len(sys.argv) == 2:
+        cplex_path = sys.argv[1]
+    else:
+        cplex_path = None
+
     ofile = "results.hdf5"
     ks = [2, 4, 8, 16, 32]
     deltas = [0]  # , 0.1, 0.2]
@@ -52,6 +59,7 @@ if __name__ == "__main__":
         algos = [
             kcenter.UnfairKCenter(k),
             kcenter.BeraEtAlKCenter(k),
+            baseline.adapter.KFC(k, cplex_path=cplex_path)
         ] + [
             kcenter.CoresetFairKCenter(
                 k, tau, seed=seed, integer_programming=False)

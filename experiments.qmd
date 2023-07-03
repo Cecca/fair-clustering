@@ -22,12 +22,15 @@ load_data <- function() {
 
   results <- tbl(con, sql("select *, json_extract(params, '$.tau') / k as tau, cast(additional_metrics -> '$.coreset_radius' as real) as coreset_radius from results")) |> 
     filter(delta == 0) |>
+    inner_join(tbl(con, "dataset_stats")) |>
     collect() |>
     mutate(
       timeout_s = if_else(time_s > 30*60, 30*60, timeout_s),
       timed_out = !is.na(timeout_s),
       time_s = if_else(timed_out, timeout_s, time_s),
-      img_path = imgpath(hdf5_key)
+      img_path = imgpath(hdf5_key),
+      coreset_size_frac = tau * k / n,
+      dataset = fct_reorder(dataset, desc(n))
     ) |>
     group_by(dataset, k) |>
     mutate(scaled_radius = radius / min(radius)) |>
@@ -38,6 +41,12 @@ load_data <- function() {
 }
 
 results <- load_data()
+```
+
+```{r}
+load_data() |>
+  distinct(dataset, n, dimensions) |>
+  arrange(desc(n))
 ```
 
 ```{r}
@@ -87,13 +96,16 @@ load_data() |>
 #| fig-width: 15
 #| fig-height: 15
 load_data() |>
-  ggplot(aes(tau, scaled_radius, color=factor(k))) +
+  ggplot(aes(coreset_size_frac, scaled_radius, color=factor(k))) +
   geom_line(data=~drop_na(., coreset_radius), stat="summary") +
+  geom_point(data=~drop_na(., coreset_radius)) +
   geom_hline(
     aes(yintercept = scaled_radius),
     data=~filter(., algorithm == "bera-et-al-k-center"), 
     color="black"
   ) +
+  scale_y_continuous(limits=c(1,NA)) +
+  scale_x_continuous(limits=c(0,1), labels=scales::percent) +
   facet_grid(vars(dataset), vars(factor(k)), scales="free")
 ```
 

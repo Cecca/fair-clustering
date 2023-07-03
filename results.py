@@ -95,6 +95,13 @@ def get_db():
         """,
         """
         ALTER TABLE results ADD COLUMN timeout_s REAL;
+        """,
+        """
+        CREATE TABLE dataset_stats (
+            dataset      TEXT PRIMARY KEY,
+            n            INT,
+            dimensions   INT
+        );
         """
     ]
     dbver = db.execute("PRAGMA user_version").fetchone()[0]
@@ -103,6 +110,18 @@ def get_db():
         if dbver < ver:
             db.executescript(mig)
             db.execute(f"PRAGMA user_version = {ver}")
+
+    # Add dataset stats
+    for dataset in datasets.datasets():
+        n, dim = datasets.dataset_size(dataset)
+        db.execute(
+            "INSERT INTO dataset_stats VALUES (:dataset, :n, :dim) ON CONFLICT DO NOTHING",
+            {
+                "dataset": dataset,
+                "n": n,
+                "dim": dim
+            }
+        )
 
     return db
 
