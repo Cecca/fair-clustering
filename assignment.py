@@ -2,6 +2,7 @@ import logging
 
 from pulp import LpProblem, LpVariable, lpSum, LpStatus, LpConstraint, LpConstraintEQ, LpConstraintGE, LpConstraintLE
 from pulp.apis import COIN_CMD
+from pulp.apis.core import PulpSolverError
 import numpy as np
 import time
 
@@ -46,7 +47,10 @@ def inner_fair_assignment(R, costs, colors, fairness_constraints, solver, intege
     logging.info("  Setup LP in %f s", t_setup_end - t_setup_start)
 
     t_solve_start = time.time()
-    prob.solve(solver)
+    try:
+        prob.solve(solver)
+    except PulpSolverError:
+        return None
     # prob.solve(COIN_CMD(mip=integer, msg=False))
     t_solve_end = time.time()
     logging.info("  Solve LP in %f s", t_solve_end - t_solve_start)
@@ -107,7 +111,10 @@ def inner_weighted_fair_assignment(R, costs, weights, fairness_constraints, solv
 
     t_solve_start = time.time()
     # prob.solve(COIN_CMD(mip=integer, msg=False))
-    prob.solve(solver)
+    try:
+        prob.solve(solver)
+    except PulpSolverError:
+        return None
     t_solve_end = time.time()
     logging.info("  Solve LP in %f s", t_solve_end - t_solve_start)
     if LpStatus[prob.status] == "Optimal":
@@ -199,7 +206,10 @@ def round_assignment(n, k, ncolors, input_assignment, colors, solver):
                              cluster_sizes,
                              colored_cluster_sizes,
                              blacklist)
-        lp.solve(solver)
+        try:
+            lp.solve(solver)
+        except PulpSolverError:
+            return None
         # lp.solve(COIN_CMD(mip=False, msg=False))
         assert LpStatus[lp.status] == "Optimal"
 
@@ -314,7 +324,10 @@ def weighted_round_assignment(R, n, k, ncolors, costs, input_assignment, weights
                              cluster_sizes,
                              colored_cluster_sizes,
                              blacklist)
-        lp.solve(solver)
+        try:
+            lp.solve(solver)
+        except PulpSolverError:
+            return None
         # lp.solve(COIN_CMD(mip=False, msg=False))
         logging.info("status: %s", LpStatus[lp.status])
         assert LpStatus[lp.status] == "Optimal"
@@ -419,8 +432,8 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints, solve
 
         last_valid = None
         low, high = 0, allcosts.shape[0] - 1
-        while low < high:
-            # while last_valid is None or relative_difference(high, low) >= 0.01:
+        # while low < high:
+        while last_valid is None or relative_difference(high, low) >= 0.1:
             logging.info("Relative difference %f",
                          relative_difference(high, low))
             mid = low + (high - low) // 2
