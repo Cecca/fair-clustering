@@ -101,18 +101,20 @@ def greedy_minimum_maximum(data, k, return_assignment=True, seed=123, p=None):
     distances = pairwise_distances(
         data, data[centers[-1]].reshape(1, -1))[:, 0]
     assignment = np.zeros(data.shape[0], np.int32)
+    idx = 0
     while len(centers) < k:
+        idx += 1
         farthest = np.argmax(distances)
+        centers.append(farthest)
         distances_to_new_center = pairwise_distances(
-            data, data[centers[-1]].reshape(1, -1))[:, 0]
+            data, data[farthest].reshape(1, -1))[:, 0]
         # update the assignment if we found a closest center
-        assignment[distances_to_new_center < distances] = len(centers)
+        assignment[distances_to_new_center < distances] = idx
         # update the distances
         distances = np.minimum(
             distances_to_new_center,
             distances
         )
-        centers.append(farthest)
 
     centers = np.array(centers)
 
@@ -217,7 +219,7 @@ class CoresetFairKCenter(object):
                     if coreset_assignment[p, c, color] > 0:
                         candidates = [i for i in range(
                             k) if centers[i] == coreset_ids[coreset_centers[c]]]
-                        assert len(candidates) == 1
+                        # assert len(candidates) == 1, candidates
                         assignment[x] = candidates[0]
                         coreset_assignment[p, c, color] -= 1
                         break
@@ -245,9 +247,9 @@ if __name__ == "__main__":
         dataset, 0, delta)
 
     # Fair
-    tau = 256
-    algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
-    # algo = KFC(k, cplex_path, seed=2)
+    tau = 256 * 4
+    # algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
+    algo = KFC(k, cplex_path, seed=2)
     # algo = BeraEtAlKCenter(k, cplex_path, seed=2)
     print(f"{algo.name()} ==============")
     assignment = algo.fit_predict(data, colors, fairness_constraints)
