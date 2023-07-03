@@ -1,10 +1,11 @@
 import pulp
+from pulp.apis.core import PulpSolverError
 import logging
 import time
-try:
-    from .shared_utils import *
-except:
-    from shared_utils import *
+# try:
+from baseline.shared_utils import *
+# except:
+#     from shared_utils import *
 
 
 """
@@ -13,6 +14,13 @@ Returns: Lpproblem, status, clusters
 
 
 def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, reps=5):
+    name_map = {}
+    def _remap(signature):
+        """Remaps variable names so that they are not too long"""
+        if signature not in name_map:
+            name_map[signature] = f"x{len(name_map)}"
+        return name_map[signature]
+
     t_setup = time.time()
     d = distance_matrix(C, S)
 
@@ -55,7 +63,7 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
     for Sprime in joiners.keys():
         for c in joiners[Sprime].keys():
             for j in Sprime:
-                variable_sig = tuple([tuple(Sprime), tuple([c]), tuple([j])])
+                variable_sig = _remap(tuple([tuple(Sprime), tuple([c]), tuple([j])]))
                 # print(ast.literal_eval(str(variable_sig)))
                 variables[variable_sig] = p.LpVariable(
                     str(variable_sig).replace(' ', ''), lowBound=0)
@@ -74,7 +82,7 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
         for Sprime in joiners.keys():
             if j in Sprime:
                 for c in joiners[Sprime].keys():
-                    var_sig = tuple([tuple(Sprime), tuple([c]), tuple([j])])
+                    var_sig = _remap(tuple([tuple(Sprime), tuple([c]), tuple([j])]))
                     all_vars.append(variables[var_sig])
         all_vars_sum = p.lpSum(all_vars)
 
@@ -85,8 +93,8 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
                 if j in Sprime:
                     for c in joiners[Sprime].keys():
                         if a in c:
-                            var_sig = tuple(
-                                [tuple(Sprime), tuple([c]), tuple([j])])
+                            var_sig = _remap(tuple(
+                                [tuple(Sprime), tuple([c]), tuple([j])]))
                             vars_in_group.append(variables[var_sig])
 
             # Finally, add the alpha and beta constraints
@@ -104,7 +112,7 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
 
             points_sprime_c = []
             for j in Sprime:
-                var_sig = tuple([tuple(Sprime), tuple([c]), tuple([j])])
+                var_sig = _remap(tuple([tuple(Sprime), tuple([c]), tuple([j])]))
                 points_sprime_c.append(variables[var_sig])
 
             Lp_prob += p.lpSum(points_sprime_c) == L_c_Sprime
@@ -112,17 +120,17 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
     logging.info("Setup time: %f", elapsed_setup)
 
     t_solve = time.time()
-    # try:
     solver_cmd = solver if solver is not None else solver_cmd
-    status = Lp_prob.solve(solver_cmd)
+    try:
+        status = Lp_prob.solve(solver_cmd)
+    except PulpSolverError:
+        status = 0
     elapsed_solve = time.time() - t_solve
     logging.info("Solve time: %f", elapsed_solve)
-    # except:
-    #     print("Exception whiile solving the problem!")
-    #     status = 0
 
     if p.LpStatus[status] != 'Optimal':
         return None, status, None, None
+    logging.info("The problem was feasible")
 
     best_cluster = None
     lowest_violation = 2e9
@@ -132,11 +140,12 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
         for Sprime in joiners.keys():
             for c in joiners[Sprime].keys():
                 L_c_Sprime = len(joiners[Sprime][c])
-                probs = [variables[tuple([tuple(Sprime), tuple([c]), tuple([j])])].value(
+                probs = [variables[_remap(tuple([tuple(Sprime), tuple([c]), tuple([j])]))].value(
                 )/L_c_Sprime for j in Sprime]
                 assert abs(sum(probs)-1) < 1e-4
                 probs = np.array(probs)
                 probs[probs < 0] = 0
+                probs = probs / np.sum(probs)
                 draw = np.random.choice(Sprime, L_c_Sprime, p=probs)
                 for i, idx in enumerate(joiners[Sprime][c]):
                     to = draw[i]

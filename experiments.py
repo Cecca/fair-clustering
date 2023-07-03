@@ -5,7 +5,7 @@ import datasets
 import itertools
 import logging
 import signal
-import baseline
+from baseline.adapter import KFC
 
 TIMEOUT_SECS = 30*60
 
@@ -52,14 +52,14 @@ if __name__ == "__main__":
 
     ofile = "results.hdf5"
     ks = [2, 4, 8, 16, 32]
-    deltas = [0]  # , 0.1, 0.2]
+    deltas = [0, 0.1]  # , 0.1, 0.2]
     all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
         algos = [
             kcenter.UnfairKCenter(k),
             kcenter.BeraEtAlKCenter(k),
-            baseline.adapter.KFC(k, cplex_path=cplex_path)
+            KFC(k, cplex_path=cplex_path)
         ] + [
             kcenter.CoresetFairKCenter(
                 k, tau, seed=seed, integer_programming=False)
