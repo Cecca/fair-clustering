@@ -27,24 +27,29 @@ class UnfairKCenter(object):
 
     def fit_predict(self, X, _colors_unused, _fairness_constraints_unused):
         start = time.time()
-        np.random.seed(self.seed)
+        centers, assignment = greedy_minimum_maximum(
+            X, self.k, return_assignment=True, seed=self.seed)
+        self.centers = centers
+        self.assignment = assignment
 
-        centers = [np.random.choice(X.shape[0])]
-        distances = pairwise_distances(X, X[centers[-1]].reshape(1, -1))
-        while len(centers) < self.k:
-            farthest = np.argmax(distances)
-            centers.append(farthest)
-            distances = np.minimum(
-                pairwise_distances(X, X[centers[-1]].reshape(1, -1)),
-                distances
-            )
-        self.centers = np.array(centers)
-
-        self.assignment = np.array([
-            np.argmin(pairwise_distances(X[centers], X[x].reshape(1, -1)))
-            for x in range(X.shape[0])
-        ])
-        assert np.all(self.assignment[centers] == np.arange(self.k))
+        # np.random.seed(self.seed)
+        #
+        # centers = [np.random.choice(X.shape[0])]
+        # distances = pairwise_distances(X, X[centers[-1]].reshape(1, -1))
+        # while len(centers) < self.k:
+        #     farthest = np.argmax(distances)
+        #     centers.append(farthest)
+        #     distances = np.minimum(
+        #         pairwise_distances(X, X[centers[-1]].reshape(1, -1)),
+        #         distances
+        #     )
+        # self.centers = np.array(centers)
+        #
+        # self.assignment = np.array([
+        #     np.argmin(pairwise_distances(X[centers], X[x].reshape(1, -1)))
+        #     for x in range(X.shape[0])
+        # ])
+        # assert np.all(self.assignment[centers] == np.arange(self.k))
         end = time.time()
         self.elapsed = end - start
         return self.assignment
@@ -91,25 +96,27 @@ class BeraEtAlKCenter(object):
 
 def greedy_minimum_maximum(data, k, return_assignment=True, seed=123, p=None):
     np.random.seed(seed)
-    centers = [np.random.choice(data.shape[0], p=p)]
-    distances = pairwise_distances(data, data[centers[-1]].reshape(1, -1))
+    first_center = np.random.choice(data.shape[0], p=p)
+    centers = [first_center]
+    distances = pairwise_distances(
+        data, data[centers[-1]].reshape(1, -1))[:, 0]
+    assignment = np.zeros(data.shape[0], np.int32)
     while len(centers) < k:
         farthest = np.argmax(distances)
-        centers.append(farthest)
+        distances_to_new_center = pairwise_distances(
+            data, data[centers[-1]].reshape(1, -1))[:, 0]
+        # update the assignment if we found a closest center
+        assignment[distances_to_new_center < distances] = len(centers)
+        # update the distances
         distances = np.minimum(
-            pairwise_distances(data, data[centers[-1]].reshape(1, -1)),
+            distances_to_new_center,
             distances
         )
+        centers.append(farthest)
 
     centers = np.array(centers)
 
     if return_assignment:
-        assignment = np.array([
-            np.argmin(pairwise_distances(
-                data[centers], data[x].reshape(1, -1)))
-            for x in range(data.shape[0])
-        ])
-        assert np.all(assignment[centers] == np.arange(k))
         return centers, assignment
     else:
         return centers
@@ -219,6 +226,11 @@ class CoresetFairKCenter(object):
 
 
 if __name__ == "__main__":
+    import cProfile
+    import pstats
+    import io
+    from pstats import SortKey
+
     import viz
     import assess
     from baseline.adapter import KFC
@@ -226,17 +238,17 @@ if __name__ == "__main__":
 
     cplex_path = "/home/matteo/opt/cplex/cplex/bin/x86-64_linux/cplex"
 
-    k = 16
+    k = 8
     delta = 0.0
-    dataset = "reuter_50_50"
+    dataset = "adult"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
 
     # Fair
-    tau = 128
-    # algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
+    tau = 256
+    algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
     # algo = KFC(k, cplex_path, seed=2)
-    algo = BeraEtAlKCenter(k, cplex_path, seed=2)
+    # algo = BeraEtAlKCenter(k, cplex_path, seed=2)
     print(f"{algo.name()} ==============")
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
@@ -244,14 +256,17 @@ if __name__ == "__main__":
     print("violation", assess.additive_violations(
         k, colors, assignment, fairness_constraints))
     print(algo.additional_metrics())
+    print("time", algo.time())
     viz.plot_clustering(data, centers, assignment, filename="clustering.png")
 
     # Greedy
     print("Greedy ==============")
     algo = UnfairKCenter(k)
+
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
     print("radius", assess.radius(data, centers, assignment))
     print("violation", assess.additive_violations(
         k, colors, assignment, fairness_constraints))
+    print("time", algo.time())
     viz.plot_clustering(data, centers, assignment, filename="greedy.png")
