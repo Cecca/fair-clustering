@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.metrics import pairwise_distances
 import logging
 import time
+import pulp
 
 import datasets
 from assignment import weighted_fair_assignment, fair_assignment
@@ -50,9 +51,12 @@ class UnfairKCenter(object):
 
 
 class BeraEtAlKCenter(object):
-    def __init__(self, k, seed=123):
+    def __init__(self, k, cplex_path=None, seed=123):
         self.k = k
         self.seed = seed
+        self.solver_cmd = pulp.CPLEX_CMD(
+            path=cplex_path, msg=0) if cplex_path is not None else pulp.COIN_CMD(msg=False)
+        logging.info("solver is %s", self.solver_cmd)
 
     def attrs(self):
         return {}
@@ -76,7 +80,7 @@ class BeraEtAlKCenter(object):
 
         # Step 2. Find assignment
         centers, assignment = fair_assignment(
-            centers, costs, colors, fairness_constraints)
+            centers, costs, colors, fairness_constraints, solver=self.solver_cmd)
         self.centers = centers
         self.assignment = assignment
 
@@ -112,11 +116,13 @@ def greedy_minimum_maximum(data, k, return_assignment=True, seed=123, p=None):
 
 
 class CoresetFairKCenter(object):
-    def __init__(self, k, tau, integer_programming=False, seed=42):
+    def __init__(self, k, tau, cplex_path=None, seed=42):
         self.k = k
         self.tau = tau
         self.seed = seed
-        self.integer_programming = integer_programming
+        self.solver_cmd = pulp.CPLEX_CMD(
+            path=cplex_path, msg=0) if cplex_path is not None else pulp.COIN_CMD(msg=False)
+        logging.info("solver is %s", self.solver_cmd)
 
     def name(self):
         return "coreset-fair-k-center"
@@ -127,8 +133,7 @@ class CoresetFairKCenter(object):
     def attrs(self):
         return {
             "tau": self.tau,
-            "seed": self.seed,
-            "integer_programming": self.integer_programming
+            "seed": self.seed
         }
 
     def additional_metrics(self):
@@ -164,7 +169,7 @@ class CoresetFairKCenter(object):
 
         # Step 3. Find a fair assignment with the centers in the coreset
         coreset_centers, coreset_assignment = weighted_fair_assignment(
-            centers, costs, weights, fairness_constraints)
+            centers, costs, weights, fairness_constraints, solver=self.solver_cmd)
 
         # Step 4. Assign the input points to the centers found before
         centers, assignment = self.assign_original_points(
@@ -228,10 +233,10 @@ if __name__ == "__main__":
         dataset, 0, delta)
 
     # Fair
-    tau = 4096
-    # algo = CoresetFairKCenter(k, tau, seed=2)
-    algo = KFC(k, cplex_path, seed=2)
-    # algo = BeraEtAlKCenter(k, seed=2)
+    tau = 128
+    # algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
+    # algo = KFC(k, cplex_path, seed=2)
+    algo = BeraEtAlKCenter(k, cplex_path, seed=2)
     print(f"{algo.name()} ==============")
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers

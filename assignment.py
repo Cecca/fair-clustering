@@ -6,7 +6,7 @@ import numpy as np
 import time
 
 
-def inner_fair_assignment(R, costs, colors, fairness_constraints, integer=False):
+def inner_fair_assignment(R, costs, colors, fairness_constraints, solver, integer=False):
     t_setup_start = time.time()
     vartype = "Integer" if integer else "Continuous"
     n, k = costs.shape
@@ -46,7 +46,8 @@ def inner_fair_assignment(R, costs, colors, fairness_constraints, integer=False)
     logging.info("  Setup LP in %f s", t_setup_end - t_setup_start)
 
     t_solve_start = time.time()
-    prob.solve(COIN_CMD(mip=integer, msg=False))
+    prob.solve(solver)
+    # prob.solve(COIN_CMD(mip=integer, msg=False))
     t_solve_end = time.time()
     logging.info("  Solve LP in %f s", t_solve_end - t_solve_start)
 
@@ -63,7 +64,7 @@ def inner_fair_assignment(R, costs, colors, fairness_constraints, integer=False)
         return None
 
 
-def inner_weighted_fair_assignment(R, costs, weights, fairness_constraints, integer=False):
+def inner_weighted_fair_assignment(R, costs, weights, fairness_constraints, solver, integer=False):
     t_setup_start = time.time()
     vartype = "Integer" if integer else "Continuous"
     n, k = costs.shape
@@ -105,7 +106,8 @@ def inner_weighted_fair_assignment(R, costs, weights, fairness_constraints, inte
     logging.info("  Setup LP in %f s", t_setup_end - t_setup_start)
 
     t_solve_start = time.time()
-    prob.solve(COIN_CMD(mip=integer, msg=False))
+    # prob.solve(COIN_CMD(mip=integer, msg=False))
+    prob.solve(solver)
     t_solve_end = time.time()
     logging.info("  Solve LP in %f s", t_solve_end - t_solve_start)
     if LpStatus[prob.status] == "Optimal":
@@ -127,7 +129,7 @@ def inner_weighted_fair_assignment(R, costs, weights, fairness_constraints, inte
         return None
 
 
-def round_assignment(n, k, ncolors, input_assignment, colors):
+def round_assignment(n, k, ncolors, input_assignment, colors, solver):
     VARIABLE = 0
     CLUSTER_CONSTRAINT = 1
     COLORED_CLUSTER_CONSTRAINT = 2
@@ -197,7 +199,8 @@ def round_assignment(n, k, ncolors, input_assignment, colors):
                              cluster_sizes,
                              colored_cluster_sizes,
                              blacklist)
-        lp.solve(COIN_CMD(mip=False, msg=False))
+        lp.solve(solver)
+        # lp.solve(COIN_CMD(mip=False, msg=False))
         assert LpStatus[lp.status] == "Optimal"
 
         residual = np.zeros(k)
@@ -223,7 +226,7 @@ def round_assignment(n, k, ncolors, input_assignment, colors):
     return output_assignment
 
 
-def weighted_round_assignment(R, n, k, ncolors, costs, input_assignment, weights):
+def weighted_round_assignment(R, n, k, ncolors, costs, input_assignment, weights, solver):
     VARIABLE = 0
     CLUSTER_CONSTRAINT = 1
     COLORED_CLUSTER_CONSTRAINT = 2
@@ -311,7 +314,8 @@ def weighted_round_assignment(R, n, k, ncolors, costs, input_assignment, weights
                              cluster_sizes,
                              colored_cluster_sizes,
                              blacklist)
-        lp.solve(COIN_CMD(mip=False, msg=False))
+        lp.solve(solver)
+        # lp.solve(COIN_CMD(mip=False, msg=False))
         logging.info("status: %s", LpStatus[lp.status])
         assert LpStatus[lp.status] == "Optimal"
 
@@ -342,7 +346,7 @@ def weighted_round_assignment(R, n, k, ncolors, costs, input_assignment, weights
     return output_assignment
 
 
-def fair_assignment(centers, costs, colors, fairness_contraints):
+def fair_assignment(centers, costs, colors, fairness_contraints, solver):
     k = centers.shape[0]
     n = colors.shape[0]
     ncolors = np.max(colors) + 1
@@ -362,7 +366,7 @@ def fair_assignment(centers, costs, colors, fairness_contraints):
             R = allcosts[mid]
             logging.info("R %f", R)
             assignment = inner_fair_assignment(
-                R, costs, colors, fairness_contraints)
+                R, costs, colors, fairness_contraints, solver)
             if low == high:
                 assert assignment is not None
                 return assignment
@@ -379,7 +383,7 @@ def fair_assignment(centers, costs, colors, fairness_contraints):
 
     assignment = binary_search()
     assignment = round_assignment(
-        n, k, ncolors, assignment, colors)
+        n, k, ncolors, assignment, colors, solver)
     return centers, assignment
 
 
@@ -404,7 +408,7 @@ def _weighted_assignment_radius(costs, centers, weighted_assignment):
     return max_cost
 
 
-def weighted_fair_assignment(centers, costs, weights, fairness_contraints):
+def weighted_fair_assignment(centers, costs, weights, fairness_contraints, solver):
     k = centers.shape[0]
     n, ncolors = weights.shape
     allcosts = np.sort(np.unique(costs))
@@ -423,7 +427,7 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints):
             R = allcosts[mid]
             logging.info("R %f", R)
             assignment = inner_weighted_fair_assignment(
-                R, costs, weights, fairness_contraints)
+                R, costs, weights, fairness_contraints, solver)
             if low == high:
                 return assignment, R
             if assignment is None:
@@ -445,7 +449,7 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints):
     logging.info("Radius of the fractional weight assignment %f", fradius)
 
     assignment = weighted_round_assignment(
-        R, n, k, ncolors, costs, wassignment, weights)
+        R, n, k, ncolors, costs, wassignment, weights, solver)
     radius = _weighted_assignment_radius(costs, centers, assignment)
     logging.info("Radius of the weight assignment after rounding %f", radius)
     assert radius <= fradius

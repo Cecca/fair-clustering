@@ -11,3 +11,4 @@ experiments.html
 fairclustering.sif
 slurm-*.out
 coreset-clustering.png
+*.log

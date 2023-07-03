@@ -58,11 +58,11 @@ if __name__ == "__main__":
         n, dim = datasets.dataset_size(dataset)
         algos = [
             kcenter.UnfairKCenter(k),
-            kcenter.BeraEtAlKCenter(k),
-            KFC(k, cplex_path=cplex_path)
+            kcenter.BeraEtAlKCenter(k, cplex_path),
+            KFC(k, cplex_path)
         ] + [
             kcenter.CoresetFairKCenter(
-                k, tau, seed=seed, integer_programming=False)
+                k, tau, cplex_path, seed=seed, integer_programming=False)
             for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k, 512*k, 1024*k, 2048*k]
             for seed in range(1, 3)
             if tau <= n
