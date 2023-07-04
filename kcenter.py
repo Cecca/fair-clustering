@@ -240,16 +240,18 @@ if __name__ == "__main__":
 
     cplex_path = "/home/matteo/opt/cplex/cplex/bin/x86-64_linux/cplex"
 
-    k = 8
+    k = 32
     delta = 0.0
     dataset = "adult"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
+    n, dims = datasets.dataset_size(dataset)
 
     # Fair
-    tau = 256 * 4
-    # algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
-    algo = KFC(k, cplex_path, seed=2)
+    tau = int(0.15*n)
+    logging.info("Tau is %d", tau)
+    algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
+    # algo = KFC(k, cplex_path, seed=2)
     # algo = BeraEtAlKCenter(k, cplex_path, seed=2)
     print(f"{algo.name()} ==============")
     assignment = algo.fit_predict(data, colors, fairness_constraints)
@@ -262,13 +264,13 @@ if __name__ == "__main__":
     viz.plot_clustering(data, centers, assignment, filename="clustering.png")
 
     # Greedy
-    print("Greedy ==============")
-    algo = UnfairKCenter(k)
-
-    assignment = algo.fit_predict(data, colors, fairness_constraints)
-    centers = algo.centers
-    print("radius", assess.radius(data, centers, assignment))
-    print("violation", assess.additive_violations(
-        k, colors, assignment, fairness_constraints))
-    print("time", algo.time())
-    viz.plot_clustering(data, centers, assignment, filename="greedy.png")
+    # print("Greedy ==============")
+    # algo = UnfairKCenter(k)
+    #
+    # assignment = algo.fit_predict(data, colors, fairness_constraints)
+    # centers = algo.centers
+    # print("radius", assess.radius(data, centers, assignment))
+    # print("violation", assess.additive_violations(
+    #     k, colors, assignment, fairness_constraints))
+    # print("time", algo.time())
+    # viz.plot_clustering(data, centers, assignment, filename="greedy.png")

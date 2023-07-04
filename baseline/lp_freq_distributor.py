@@ -15,6 +15,7 @@ Returns: Lpproblem, status, clusters
 
 def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, reps=5):
     name_map = {}
+
     def _remap(signature):
         """Remaps variable names so that they are not too long"""
         if signature not in name_map:
@@ -63,10 +64,13 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
     for Sprime in joiners.keys():
         for c in joiners[Sprime].keys():
             for j in Sprime:
-                variable_sig = _remap(tuple([tuple(Sprime), tuple([c]), tuple([j])]))
+                variable_sig = _remap(
+                    tuple([tuple(Sprime), tuple([c]), tuple([j])]))
                 # print(ast.literal_eval(str(variable_sig)))
                 variables[variable_sig] = p.LpVariable(
                     str(variable_sig).replace(' ', ''), lowBound=0)
+
+    logging.info("There are %d variables", len(variables))
 
     obj = 1
     Lp_prob = p.LpProblem('Problem', p.LpMaximize)
@@ -82,7 +86,8 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
         for Sprime in joiners.keys():
             if j in Sprime:
                 for c in joiners[Sprime].keys():
-                    var_sig = _remap(tuple([tuple(Sprime), tuple([c]), tuple([j])]))
+                    var_sig = _remap(
+                        tuple([tuple(Sprime), tuple([c]), tuple([j])]))
                     all_vars.append(variables[var_sig])
         all_vars_sum = p.lpSum(all_vars)
 
@@ -112,7 +117,8 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
 
             points_sprime_c = []
             for j in Sprime:
-                var_sig = _remap(tuple([tuple(Sprime), tuple([c]), tuple([j])]))
+                var_sig = _remap(
+                    tuple([tuple(Sprime), tuple([c]), tuple([j])]))
                 points_sprime_c.append(variables[var_sig])
 
             Lp_prob += p.lpSum(points_sprime_c) == L_c_Sprime

@@ -73,6 +73,8 @@ def inner_weighted_fair_assignment(R, costs, weights, fairness_constraints, solv
     vartype = "Integer" if integer else "Continuous"
     n, k = costs.shape
     ncolors = weights.shape[1]
+    logging.info("n=%d k=%d ncolors=%d upper bound=%d",
+                 n, k, ncolors, n*k*ncolors)
     prob = LpProblem()
     vars = {}
     # Set up the variables
@@ -83,6 +85,8 @@ def inner_weighted_fair_assignment(R, costs, weights, fairness_constraints, solv
                     if weights[x, color] > 0:
                         vars[x, c, color] = LpVariable(
                             f"x_{x}_{c}_{color}", 0, cat=vartype)
+
+    logging.info("There are %d variables in the problem", len(vars))
 
     # All the weight should be assigned
     for x in range(n):

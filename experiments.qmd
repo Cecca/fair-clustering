@@ -9,6 +9,7 @@ execute:
 ```{r}
 library(tidyverse)
 library(ggpattern)
+library(kableExtra)
 theme_set(theme_bw() + theme(legend.position="bottom"))
 
 imgdir <- "imgs"
@@ -17,10 +18,22 @@ imgpath <- function(key) {
   str_c(imgdir, key, "clustering.png", sep="/")
 }
 
+dataset_stats <- function() {
+  con <- DBI::dbConnect(RSQLite::SQLite(), "results.db")
+  stats <- tbl(con, "dataset_stats") |> collect()
+  DBI::dbDisconnect(con)
+  stats
+}
+
 load_data <- function() {
   con <- DBI::dbConnect(RSQLite::SQLite(), "results.db")
 
-  results <- tbl(con, sql("select *, json_extract(params, '$.tau') / k as tau, cast(additional_metrics -> '$.coreset_radius' as real) as coreset_radius from results")) |> 
+  q <- "select *, json_extract(params, '$.tau') / k as tau,
+        cast(additional_metrics -> '$.coreset_radius' as real) as coreset_radius,
+        cast(additional_metrics -> '$.time_coreset_s' as real) as coreset_time_s
+        from results"
+
+  results <- tbl(con, sql(q)) |> 
     filter(delta == 0) |>
     inner_join(tbl(con, "dataset_stats")) |>
     collect() |>
@@ -33,7 +46,7 @@ load_data <- function() {
       dataset = fct_reorder(dataset, desc(n))
     ) |>
     group_by(dataset, k) |>
-    mutate(scaled_radius = radius / min(radius)) |>
+    mutate(scaled_radius = radius / min(radius, na.rm=T)) |>
     ungroup()
 
   DBI::dbDisconnect(con)
@@ -41,12 +54,19 @@ load_data <- function() {
 }
 
 results <- load_data()
+dataojs <- results |>
+  select(dataset, k, algorithm, tau, radius, time_s, scaled_radius) |>
+  group_by(dataset, k, algorithm, tau) |>
+  summarise(across(c(radius, time_s, scaled_radius), mean))
+ojs_define(data = dataojs)
 ```
 
 ```{r}
-load_data() |>
+dataset_stats() |>
   distinct(dataset, n, dimensions) |>
-  arrange(desc(n))
+  arrange(desc(n)) |>
+  kbl() |>
+  kable_styling()
 ```
 
 ```{r}
@@ -84,28 +104,72 @@ load_data() |>
 ```
 
 ```{r}
+#| fig-cap: Coreset radius at different coreset sizes, scaled as a percentage of the input size
+#| fig-width: 10
+#| column: page
 load_data() |>
-  ggplot(aes(tau, coreset_radius, color=factor(k))) +
+  ggplot(aes(coreset_size_frac, coreset_radius, color=factor(k))) +
   geom_line(data=~drop_na(., coreset_radius)) +
+  scale_x_continuous(limits=c(0,1), labels=scales::percent) +
   facet_grid(vars(dataset), vars(factor(k)), scales="free")
 ```
 
 ```{r}
-#| column: screen
+#| column: page
+#| fig-cap: Radius of the solution wrt the coreset size
 #| out-width: "100%"
-#| fig-width: 15
-#| fig-height: 15
+#| fig-width: 10
+#| fig-height: 10
 load_data() |>
-  ggplot(aes(coreset_size_frac, scaled_radius, color=factor(k))) +
+  ggplot(aes(coreset_size_frac, scaled_radius, color=algorithm)) +
   geom_line(data=~drop_na(., coreset_radius), stat="summary") +
-  geom_point(data=~drop_na(., coreset_radius)) +
+  geom_point(data=~drop_na(., coreset_radius), size=1) +
   geom_hline(
-    aes(yintercept = scaled_radius),
-    data=~filter(., algorithm == "bera-et-al-k-center"), 
-    color="black"
+    aes(yintercept = scaled_radius, color=algorithm),
+    data=~filter(., algorithm != "coreset-fair-k-center")
   ) +
   scale_y_continuous(limits=c(1,NA)) +
   scale_x_continuous(limits=c(0,1), labels=scales::percent) +
   facet_grid(vars(dataset), vars(factor(k)), scales="free")
 ```
+
+Notable things in @fig-time are that the KFC algorithm has some sudden jumps in the running 
+time with increases in $k$, due to changes in the _joiners_ structure as $k$ increases: the 
+radius becomes smaller hence the problem becomes larger.
+
+```{r}
+#| label: fig-time
+#| column: page
+#| fig-cap: Running time
+#| out-width: "100%"
+#| fig-width: 10
+#| fig-height: 10
+filterfn <- function(dat) {
+  dat |>
+    filter(coreset_size_frac <= 1) |>
+    drop_na(coreset_size_frac)
+}
+
+load_data() |>
+  ggplot(aes(y=time_s, color=algorithm, fill=algorithm)) +
+  geom_line(aes(x=coreset_size_frac), data=filterfn, stat="summary") +
+  geom_area(aes(x=coreset_size_frac, y=time_s), data=filterfn, alpha=0.2, stat="summary") +
+  geom_area(aes(x=coreset_size_frac, y=coreset_time_s), data=filterfn, stat="summary") +
+  # geom_point(data=filterfn, size=1) +
+  geom_hline(
+    aes(yintercept = time_s, color=algorithm, fill=algorithm),
+    data=~filter(., algorithm != "coreset-fair-k-center")
+  ) +
+  scale_x_continuous(limits=c(0,1), labels=scales::percent) +
+  facet_grid(vars(dataset), vars(factor(k)), scales="free")
+```
+
+```{ojs}
+viewof search = Inputs.search(transpose(data))
+```
+
+```{ojs}
+Inputs.table(search)
+```
+
 
