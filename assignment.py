@@ -241,6 +241,8 @@ def weighted_round_assignment(R, n, k, ncolors, costs, input_assignment, weights
     CLUSTER_CONSTRAINT = 1
     COLORED_CLUSTER_CONSTRAINT = 2
 
+    logging.info("Rounding with radius %f", R)
+
     def _setup_lp(point_ids, weights, cluster_sizes, colored_cluster_sizes, blacklist):
         print("total weight to assign ", np.sum(weights))
         lp = LpProblem()
@@ -465,5 +467,5 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints, solve
         R, n, k, ncolors, costs, wassignment, weights, solver)
     radius = _weighted_assignment_radius(costs, centers, assignment)
     logging.info("Radius of the weight assignment after rounding %f", radius)
-    assert radius <= fradius
+    assert radius <= R
     return centers, assignment
