@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
     ofile = "results.hdf5"
     ks = [2, 4, 8, 16, 32]
-    deltas = [0, 0.1]  # , 0.1, 0.2]
+    deltas = [0]  # , 0.1, 0.2]
     all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
@@ -62,7 +62,7 @@ if __name__ == "__main__":
             KFC(k, cplex_path)
         ] + [
             kcenter.CoresetFairKCenter(
-                k, tau, cplex_path, seed=seed, integer_programming=False)
+                k, tau, cplex_path, seed=seed)
             for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k, 512*k, 1024*k, 2048*k]
             for seed in range(1, 3)
             if tau <= n
