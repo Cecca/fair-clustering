@@ -528,7 +528,6 @@ def inner_freq_distributor(R, costs, weights, fairness_constraints, solver):
                 if c in joiner_centers and color == ccolor and cc == c
             ]
             assert len(colored_cluster_vars) <= len(cluster_vars)
-            assert len(colored_cluster_vars) > 0
             colored_cluster_size = lpSum(colored_cluster_vars)
             lp += LpConstraint(beta * cluster_size - colored_cluster_size,
                                LpConstraintLE,
