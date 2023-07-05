@@ -17,7 +17,7 @@ def plot_clustering(data, centers, assignment, r=None, size=None, filename="clus
 
     for c in cluster:
         cdata = data[assignment == c]
-        plt.scatter(cdata[:, 0], cdata[:, 1])
+        plt.scatter(cdata[:, 0], cdata[:, 1], s=1)
 
     plt.scatter(data[centers, 0], data[centers, 1],
                 s=200, marker="x", c="black")

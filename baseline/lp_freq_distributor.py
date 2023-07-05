@@ -24,6 +24,7 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
 
     t_setup = time.time()
     d = distance_matrix(C, S)
+    logging.info("distance computation %f s", time.time() - t_setup)
 
     l = len(groups)
     points = {i: [] for i in range(len(C))}

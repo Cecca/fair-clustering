@@ -113,7 +113,7 @@ class CoresetFairKCenter(object):
         self.seed = seed
         self.subroutine_name = subroutine_name
         self.solver_cmd = pulp.CPLEX_CMD(
-            path=cplex_path, msg=0) if cplex_path is not None else pulp.COIN_CMD(msg=False)
+            path=cplex_path, msg=False) if cplex_path is not None else pulp.COIN_CMD(msg=False)
         logging.info("solver is %s", self.solver_cmd)
 
     def name(self):
@@ -225,15 +225,16 @@ if __name__ == "__main__":
 
     cplex_path = "/home/matteo/opt/cplex/cplex/bin/x86-64_linux/cplex"
 
-    k = 2
+    k = 64
     delta = 0.0
     dataset = "census1990"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
     n, dims = datasets.dataset_size(dataset)
+    viz.plot_dataset(dataset, "dataset.png")
 
     # Fair
-    tau = int(4)
+    tau = int(128)
     logging.info("Tau is %d", tau)
     algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
     # algo = KFC(k, cplex_path, seed=2)

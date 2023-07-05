@@ -52,6 +52,7 @@ class KFC(object):
         feasible = False
 
         while r-l > epsilon or not feasible:
+            bs_iteration_start = time.time()
             if r == l:
                 raise Exception("Boom")
             lamb = (l+r)/2
@@ -67,13 +68,20 @@ class KFC(object):
             if skip:
                 continue
 
+            logging.info("Start frequency distributor with radius %f", lamb)
+            fd_start = time.time()
             LP, status, clusters, points = frequency_distributor_lp(
                 C, S, k, groups, alpha, beta, lamb, solver=self.solver_cmd)
+            logging.info("completed frequency distributor in time %f",
+                         time.time() - fd_start)
             if p.LpStatus[status] == 'Optimal':
 
                 r, feasible = lamb, True
             else:
                 l, feasible = lamb, False
+
+            logging.info("Binary search iteration %f",
+                         time.time() - bs_iteration_start)
 
         end = time.time()
         self.elapsed = end - start

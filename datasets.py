@@ -1,20 +1,20 @@
 # UMAP uses Numba, so here we silence warnings on which we have no control
+import logging
+import zipfile
+import os
+import requests
+from numba.typed import List
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.decomposition import PCA
+import umap
+import numpy as np
+import pandas as pd
+import polars as pl
+import h5py
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
-import h5py
-import polars as pl
-import pandas as pd
-import numpy as np
-import umap
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from numba.typed import List
-import requests
-import os
-import zipfile
-import logging
 
 
 def download(url, local_filename=None):
@@ -25,7 +25,7 @@ def download(url, local_filename=None):
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
         with open(local_filename, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=8192): 
+            for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
     return local_filename
 
@@ -42,7 +42,8 @@ def write_hdf5(data, colors, encoders, fname):
             warnings.warn("Dataset too large, skipping UMAP mapping")
         hfp["colors"] = colors
         for k in encoders:
-            hfp["colors"].attrs[f"encoding-{k}"] = encoders[k].classes_.astype(bytes)
+            hfp["colors"].attrs[f"encoding-{k}"] = encoders[k].classes_.astype(
+                bytes)
 
 
 def random_dbg():
@@ -52,7 +53,7 @@ def random_dbg():
         return fname
     n = 10
     data = np.random.standard_normal((n, 2))
-    colors = np.random.random_integers(0, 1, (n,1))
+    colors = np.random.random_integers(0, 1, (n, 1))
     write_hdf5(data, colors, {}, fname)
     return fname
 
@@ -72,7 +73,8 @@ def creditcard():
             )
             df = pl.from_pandas(df)
 
-    attributes = ["LIMIT_BAL","AGE","BILL_AMT1","BILL_AMT2","BILL_AMT3","BILL_AMT4","BILL_AMT5","BILL_AMT6","PAY_AMT1","PAY_AMT2","PAY_AMT3","PAY_AMT4","PAY_AMT5","PAY_AMT6"]
+    attributes = ["LIMIT_BAL", "AGE", "BILL_AMT1", "BILL_AMT2", "BILL_AMT3", "BILL_AMT4", "BILL_AMT5",
+                  "BILL_AMT6", "PAY_AMT1", "PAY_AMT2", "PAY_AMT3", "PAY_AMT4", "PAY_AMT5", "PAY_AMT6"]
     colors = ["SEX", "EDUCATION", "MARRIAGE"]
 
     data = df.select(attributes).to_numpy()
@@ -80,9 +82,12 @@ def creditcard():
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
-        pl.col("SEX").map(lambda c: encoders["SEX"].fit_transform(c)).explode(),
-        pl.col("MARRIAGE").map(lambda c: encoders["MARRIAGE"].fit_transform(c)).explode(),
-        pl.col("EDUCATION").map(lambda c: encoders["EDUCATION"].fit_transform(c)).explode()
+        pl.col("SEX").map(
+            lambda c: encoders["SEX"].fit_transform(c)).explode(),
+        pl.col("MARRIAGE").map(
+            lambda c: encoders["MARRIAGE"].fit_transform(c)).explode(),
+        pl.col("EDUCATION").map(
+            lambda c: encoders["EDUCATION"].fit_transform(c)).explode()
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
@@ -96,11 +101,11 @@ def census1990():
     url = "https://web.archive.org/web/20170711094723/https://archive.ics.uci.edu/ml/machine-learning-databases/census1990-mld/USCensus1990.data.txt"
     fname = download(url, "data/census1990.txt")
     df = pl.read_csv(fname).drop_nulls()
-    attributes = ["dAncstry1","dAncstry2","iAvail","iCitizen","iClass","dDepart",
-                  "iDisabl1","iDisabl2","iEnglish","iFeb55","iFertil","dHispanic",
-                  "dHour89","dHours","iImmigr","dIncome1","dIncome2","dIncome3","dIncome4","dIncome5","dIncome6","dIncome7","dIncome8","dIndustry","iKorean","iLang1","iLooking","iMarital","iMay75880","iMeans","iMilitary","iMobility","iMobillim","dOccup","iOthrserv","iPerscare","dPOB","dPoverty","dPwgt1","iRagechld","dRearning","iRelat1","iRelat2","iRemplpar","iRiders","iRlabor","iRownchld","dRpincome","iRPOB","iRrelchld","iRspouse","iRvetserv","iSchool","iSept80",
-                  "iSubfam1","iSubfam2","iTmpabsnt","dTravtime","iVietnam","dWeek89",
-                  "iWork89","iWorklwk","iWWII","iYearsch","iYearwrk","dYrsserv"]
+    attributes = ["dAncstry1", "dAncstry2", "iAvail", "iCitizen", "iClass", "dDepart",
+                  "iDisabl1", "iDisabl2", "iEnglish", "iFeb55", "iFertil", "dHispanic",
+                  "dHour89", "dHours", "iImmigr", "dIncome1", "dIncome2", "dIncome3", "dIncome4", "dIncome5", "dIncome6", "dIncome7", "dIncome8", "dIndustry", "iKorean", "iLang1", "iLooking", "iMarital", "iMay75880", "iMeans", "iMilitary", "iMobility", "iMobillim", "dOccup", "iOthrserv", "iPerscare", "dPOB", "dPoverty", "dPwgt1", "iRagechld", "dRearning", "iRelat1", "iRelat2", "iRemplpar", "iRiders", "iRlabor", "iRownchld", "dRpincome", "iRPOB", "iRrelchld", "iRspouse", "iRvetserv", "iSchool", "iSept80",
+                  "iSubfam1", "iSubfam2", "iTmpabsnt", "dTravtime", "iVietnam", "dWeek89",
+                  "iWork89", "iWorklwk", "iWWII", "iYearsch", "iYearwrk", "dYrsserv"]
     colors = ["dAge", 'iSex']
 
     data = df.select(attributes).to_numpy()
@@ -108,8 +113,10 @@ def census1990():
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
-        pl.col("dAge").map(lambda c: encoders["dAge"].fit_transform(c)).explode(),
-        pl.col("iSex").map(lambda c: encoders["iSex"].fit_transform(c)).explode()
+        pl.col("iSex").map(
+            lambda c: encoders["iSex"].fit_transform(c)).explode(),
+        pl.col("dAge").map(
+            lambda c: encoders["dAge"].fit_transform(c)).explode()
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
@@ -125,22 +132,27 @@ def adult():
     with zipfile.ZipFile(fname) as fpzip:
         with fpzip.open("adult.data") as fp:
             df = pl.read_csv(
-                fp, 
+                fp,
                 has_header=False,
-                new_columns=["age", "workclass", "final-weight", "education", "education-num", "marital-status", "occupation", "relationship", "race", "sex", "capital-gain", "capital-loss", "hours-per-week", "native-country"],
+                new_columns=["age", "workclass", "final-weight", "education", "education-num", "marital-status", "occupation",
+                             "relationship", "race", "sex", "capital-gain", "capital-loss", "hours-per-week", "native-country"],
                 null_values="?"
             )
 
     colors = ["sex", "race", "marital-status"]
-    attributes = ["age", "final-weight", "education-num", "capital-gain", "hours-per-week"]
+    attributes = ["age", "final-weight", "education-num",
+                  "capital-gain", "hours-per-week"]
     data = df.select(attributes).to_numpy()
     data = StandardScaler().fit_transform(data)
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
-        pl.col("sex").map(lambda c: encoders["sex"].fit_transform(c)).explode(),
-        pl.col("marital-status").map(lambda c: encoders["marital-status"].fit_transform(c)).explode(),
-        pl.col("race").map(lambda c: encoders["race"].fit_transform(c)).explode()
+        pl.col("sex").map(
+            lambda c: encoders["sex"].fit_transform(c)).explode(),
+        pl.col(
+            "marital-status").map(lambda c: encoders["marital-status"].fit_transform(c)).explode(),
+        pl.col("race").map(
+            lambda c: encoders["race"].fit_transform(c)).explode()
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
@@ -171,20 +183,22 @@ def diabetes():
         "number_diagnoses"
     ]
     df = (df
-        .select(pl.col(attributes), pl.col(colors))
-        .with_columns(pl.col(["age"])
-                      .str.extract_all("(\\d)+")
-                      .list.first()
-                      .cast(pl.Int64))
-        .with_columns(pl.col(["diag_1", "diag_2", "diag_3"]).cast(pl.Float64, strict=False))
-        .drop_nulls()
-    )
+          .select(pl.col(attributes), pl.col(colors))
+          .with_columns(pl.col(["age"])
+                        .str.extract_all("(\\d)+")
+                        .list.first()
+                        .cast(pl.Int64))
+          .with_columns(pl.col(["diag_1", "diag_2", "diag_3"]).cast(pl.Float64, strict=False))
+          .drop_nulls()
+          )
     data = df.select(attributes).to_numpy()
     data = StandardScaler().fit_transform(data)
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
-        pl.col("gender").map(lambda c: encoders["gender"].fit_transform(c)).explode(),
-        pl.col("race").map(lambda c: encoders["race"].fit_transform(c)).explode()
+        pl.col("gender").map(
+            lambda c: encoders["gender"].fit_transform(c)).explode(),
+        pl.col("race").map(
+            lambda c: encoders["race"].fit_transform(c)).explode()
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
@@ -215,41 +229,42 @@ def _kfc_csv(url, local_fname, ofname, attributes, color_columns, sep=","):
 
 def four_area():
     return _kfc_csv(
-        url = "https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/4area.csv",
-        local_fname = "data/4area.csv",
-        ofname = "data/4area.hdf5",
-        attributes = [str(c + 1) for c in range(8)],
-        color_columns = ["color"]
+        url="https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/4area.csv",
+        local_fname="data/4area.csv",
+        ofname="data/4area.hdf5",
+        attributes=[str(c + 1) for c in range(8)],
+        color_columns=["color"]
     )
 
 
 def c50():
     return _kfc_csv(
-        url = "https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/c50.csv",
-        local_fname = "data/c50.csv",
-        ofname = "data/c50.hdf5",
-        attributes = [str(c) for c in range(10)],
-        color_columns = ["color"]
+        url="https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/c50.csv",
+        local_fname="data/c50.csv",
+        ofname="data/c50.hdf5",
+        attributes=[str(c) for c in range(10)],
+        color_columns=["color"]
     )
 
 
 def victorian():
     return _kfc_csv(
-        url = "https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/victorian.csv",
-        local_fname = "data/victorian.csv",
-        ofname = "data/victorian.hdf5",
-        attributes = [str(c) for c in range(10)],
-        color_columns = ["color"]
+        url="https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/victorian.csv",
+        local_fname="data/victorian.csv",
+        ofname="data/victorian.hdf5",
+        attributes=[str(c) for c in range(10)],
+        color_columns=["color"]
     )
 
 
 def bank():
     return _kfc_csv(
-        url = "https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/bank_categorized.csv",
-        local_fname = "data/bank_categorized.csv",
-        ofname = "data/bank_categorized.hdf5",
-        attributes = ["age", "balance", "duration", "job", "education", "default", "housing", "loan", "contact"],
-        color_columns = ["marital"]
+        url="https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/bank_categorized.csv",
+        local_fname="data/bank_categorized.csv",
+        ofname="data/bank_categorized.hdf5",
+        attributes=["age", "balance", "duration", "job",
+                    "education", "default", "housing", "loan", "contact"],
+        color_columns=["marital"]
     )
 
 
@@ -290,17 +305,20 @@ def load(name, color_idx, delta=0.0, prefix=None):
     ])
     return data, colors, fairness_constraints
 
+
 def dataset_size(name):
     fname = DATASETS[name]()
     logging.debug("Opening %s", fname)
     with h5py.File(fname, "r") as hfp:
         return hfp["data"].shape
 
+
 def load_pca2(name):
     fname = DATASETS[name]()
     with h5py.File(fname, "r") as hfp:
-        data = hfp["data-PCA"][:,:2]
+        data = hfp["data-PCA"][:, :2]
     return data
+
 
 def load_umap(name):
     fname = DATASETS[name]()
@@ -316,4 +334,3 @@ if __name__ == "__main__":
         print("Preprocessing", dataset)
         preprocessing = DATASETS[dataset]
         preprocessing()
-

@@ -43,6 +43,8 @@ load_data <- function() {
       timeout_s = if_else(time_s > 30*60, 30*60, timeout_s),
       timed_out = !is.na(timeout_s),
       time_s = if_else(timed_out, timeout_s, time_s),
+      scaled_time_spp = time_s / n,
+      scaled_coreset_time_spp = coreset_time_s / n,
       img_path = imgpath(hdf5_key),
       coreset_size_frac = tau * k / n,
       dataset = fct_reorder(dataset, desc(n))
