@@ -2,11 +2,12 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 from sklearn.decomposition import PCA
 import logging
 
 
-def plot_clustering(data, centers, assignment, size=None, filename="clustering.png"):
+def plot_clustering(data, centers, assignment, r=None, size=None, filename="clustering.png"):
     unique, counts = np.unique(assignment, return_counts=True)
     cluster = unique[np.argsort(-counts)]
     plt.figure(figsize=(10, 10))
@@ -20,6 +21,15 @@ def plot_clustering(data, centers, assignment, size=None, filename="clustering.p
 
     plt.scatter(data[centers, 0], data[centers, 1],
                 s=200, marker="x", c="black")
+    if r is not None:
+        limits = plt.xlim(), plt.ylim()
+        for c in range(centers.shape[0]):
+            xy = tuple(data[centers[c]])
+            print(xy)
+            circ = Circle(xy, r, fill=False, clip_on=True)
+            plt.gca().add_patch(circ)
+        plt.xlim(limits[0])
+        plt.ylim(limits[1])
 
     plt.tight_layout()
     plt.savefig(filename)

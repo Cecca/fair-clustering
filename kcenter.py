@@ -248,7 +248,7 @@ if __name__ == "__main__":
     n, dims = datasets.dataset_size(dataset)
 
     # Fair
-    tau = int(0.15*n)
+    tau = int(0.05*n)
     logging.info("Tau is %d", tau)
     algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
     # algo = KFC(k, cplex_path, seed=2)

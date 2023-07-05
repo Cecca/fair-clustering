@@ -6,6 +6,8 @@ execute:
   message: false
 ---
 
+- [ ] Fare gli esperimenti con i due solver
+
 ```{r}
 library(tidyverse)
 library(ggpattern)

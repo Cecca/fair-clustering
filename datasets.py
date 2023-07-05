@@ -43,6 +43,18 @@ def write_hdf5(data, colors, encoders, fname):
             hfp["colors"].attrs[f"encoding-{k}"] = encoders[k].classes_.astype(bytes)
 
 
+def random_dbg():
+    """A small random dataset for debugging purposes"""
+    fname = "data/random.hdf5"
+    if os.path.isfile(fname):
+        return fname
+    n = 10
+    data = np.random.standard_normal((n, 2))
+    colors = np.random.random_integers(0, 1, (n,1))
+    write_hdf5(data, colors, {}, fname)
+    return fname
+
+
 def creditcard():
     ofname = "data/creditcard.hdf5"
     if os.path.isfile(ofname):
@@ -244,6 +256,7 @@ DATASETS = {
     "reuter_50_50": c50,
     "victorian": victorian,
     "bank": bank,
+    "random_dbg": random_dbg
 }
 
 

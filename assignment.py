@@ -1,7 +1,7 @@
 import logging
 
 from pulp import LpProblem, LpVariable, lpSum, LpStatus, LpConstraint, LpConstraintEQ, LpConstraintGE, LpConstraintLE
-from pulp.apis import COIN_CMD
+from pulp.apis import COIN_CMD, CPLEX_CMD
 from pulp.apis.core import PulpSolverError
 import numpy as np
 import time
@@ -473,3 +473,195 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints, solve
     logging.info("Radius of the weight assignment after rounding %f", radius)
     assert radius <= R
     return centers, assignment
+
+
+def inner_freq_distributor(R, costs, weights, fairness_contraints, solver):
+    logging.info(R)
+    joiners = {}
+    k = costs.shape[1]
+    n, ncolors = weights.shape
+
+    joiner_names = {}
+
+    def var_name(joiner_centers, center, color):
+        if joiner_centers not in joiner_names:
+            joiner_names[joiner_centers] = len(joiner_names)
+        jid = joiner_names[joiner_centers]
+        return f"x_{jid},{center},{color}"
+
+    for x in range(n):
+        reaching_centers = frozenset((costs[x] <= R).nonzero()[0])
+        if reaching_centers not in joiners:
+            joiners[reaching_centers] = []
+        joiners[reaching_centers].append(x)
+
+    logging.info("there are %d joiners", len(joiners))
+
+    lp = LpProblem()
+    vars = {}
+
+    # Variables and assignment constaints
+    for joiner_centers, xs in joiners.items():
+        for color in range(ncolors):
+            joiner_vars = []
+            joiner_weight = np.sum(weights[xs, color])
+            if joiner_weight > 0:
+                for c in joiner_centers:
+                    vname = var_name(joiner_centers, c, color)
+                    v = LpVariable(vname, 0)
+                    vars[joiner_centers, c, color] = v
+                    joiner_vars.append(v)
+                lp += lpSum(joiner_vars) == joiner_weight
+    logging.info("there are %d variables", len(vars))
+
+    # Fairness constraints
+    for c in range(k):
+        cluster_vars = [var for (joiner_centers, cc, ccolor), var in vars.items()
+                        if c in joiner_centers and cc == c]
+        cluster_size = lpSum(cluster_vars)
+        assert len(cluster_vars) > 0
+        for color in range(ncolors):
+            beta, alpha = fairness_constraints[color]
+            assert alpha >= beta
+            colored_cluster_vars = [
+                var for (joiner_centers, cc, ccolor), var in vars.items()
+                if c in joiner_centers and color == ccolor and cc == c
+            ]
+            assert len(colored_cluster_vars) <= len(cluster_vars)
+            assert len(colored_cluster_vars) > 0
+            colored_cluster_size = lpSum(colored_cluster_vars)
+            lp += LpConstraint(beta * cluster_size - colored_cluster_size,
+                               LpConstraintLE,
+                               f"lower_{c}_{color}",
+                               0)
+            lp += LpConstraint(alpha * cluster_size - colored_cluster_size,
+                               LpConstraintGE,
+                               f"upper_{c}_{color}",
+                               0)
+
+    logging.info("there are %d constraints", len(lp.constraints))
+
+    # solve the problem
+    lp.solve(solver)
+    if LpStatus[lp.status] == "Optimal":
+        logging.info("LP is feasible")
+        toassign = weights.copy().astype(np.float64)
+        wassignment = {}  # np.zeros((n,k,ncolors))
+        for (joiner_id, c, color), var in vars.items():
+            budget = var.value()
+            points = joiners[joiner_id]
+            for x in points:
+                if budget == 0:
+                    break
+                w = toassign[x, color]
+                if w > 0:
+                    if budget >= w:
+                        wassignment[x, c, color] = w
+                        toassign[x, color] = 0
+                        budget -= w
+                    else:
+                        # insufficient budget, partial assignment
+                        ww = budget
+                        wassignment[x, c, color] = ww
+                        toassign[x, color] -= ww
+                        budget = 0
+            assert budget <= 1e-10, f"Leftover budget {budget} > 0"
+
+        logging.info("leftover weight %f", np.sum(toassign))
+        logging.info("assigned weight %f", sum(wassignment.values()))
+        logging.info("target weight %f", np.sum(weights))
+        assert sum(wassignment.values()) == np.sum(weights)
+
+        return wassignment
+    else:
+        logging.info("Infeasible")
+        return None
+
+
+def freq_distributor(centers, costs, weights, fairness_contraints, solver):
+    n, ncolors = weights.shape
+    print(n, ncolors)
+    allcosts = np.sort(np.unique(costs))
+
+    def binary_search():
+        def relative_difference(high, low):
+            return (allcosts[high] - allcosts[low]) / allcosts[high]
+
+        last_valid = None
+        last_radius = None
+        low, high = 0, allcosts.shape[0] - 1
+        # Run while the relative difference is more than 1%
+        while last_valid is None or relative_difference(high, low) >= 0.1:
+            logging.info("Relative difference %f",
+                         relative_difference(high, low))
+            mid = low + (high - low) // 2
+            R = allcosts[mid]
+            logging.info("R %f", R)
+            assignment = inner_freq_distributor(
+                R, costs, weights, fairness_constraints, solver)
+            if low == high:
+                assert assignment is not None
+                return assignment, R
+            if assignment is None:
+                low = mid + 1
+            else:
+                last_valid = assignment
+                last_radius = R
+                if low == mid:
+                    return assignment, R
+                else:
+                    high = mid
+
+        assert last_valid is not None
+        return last_valid, last_radius
+
+    wassignment, R = binary_search()
+    logging.info("Radius returned by binary search %f", R)
+    # inner_freq_distributor(2.41, costs, weights, fairness_constraints, solver)
+    fradius = _weighted_assignment_radius(costs, centers, wassignment)
+    logging.info("Radius of the fractional weight assignment %f", fradius)
+
+    assignment = weighted_round_assignment(
+        R, n, k, ncolors, costs, wassignment, weights, solver)
+    radius = _weighted_assignment_radius(costs, centers, assignment)
+    logging.info("Radius of the weight assignment after rounding %f", radius)
+    assert radius <= R
+    return centers, assignment
+
+
+if __name__ == "__main__":
+    import cProfile
+    import pstats
+    import io
+    from pstats import SortKey
+    import kcenter
+    import viz
+    import assess
+    import datasets
+    from sklearn.metrics import pairwise_distances
+
+    logging.basicConfig(level=logging.INFO)
+
+    cplex_path = "/home/matteo/opt/cplex/cplex/bin/x86-64_linux/cplex"
+    solver = CPLEX_CMD(path=cplex_path, msg=False)
+
+    k = 8
+    delta = 0.0
+    dataset = "adult"
+    data, colors, fairness_constraints = datasets.load(
+        dataset, 0, delta)
+    n, dims = datasets.dataset_size(dataset)
+    algo = kcenter.UnfairKCenter(k)
+    assignment = algo.fit_predict(data, colors, fairness_constraints)
+    centers = algo.centers
+
+    # r = assess.radius(data, centers, assignment)
+    # print("radius is", r)
+    # viz.plot_clustering(data, centers, assignment, r=r, filename="rand.png")
+
+    costs = pairwise_distances(data, data[centers])
+    weights = np.zeros((n, len(fairness_constraints)), np.int32)
+    for color in range(np.max(colors) + 1):
+        weights[colors == color, color] = 1
+    assert np.sum(weights) == n
+    freq_distributor(centers, costs, weights, fairness_constraints, solver)
