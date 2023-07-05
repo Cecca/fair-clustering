@@ -58,8 +58,8 @@ if __name__ == "__main__":
         n, dim = datasets.dataset_size(dataset)
         algos = [
             kcenter.UnfairKCenter(k),
-            kcenter.BeraEtAlKCenter(k, cplex_path),
-            KFC(k, cplex_path)
+            # kcenter.BeraEtAlKCenter(k, cplex_path),
+            # KFC(k, cplex_path)
         ] + [
             kcenter.CoresetFairKCenter(
                 k, tau, cplex_path, seed=seed)

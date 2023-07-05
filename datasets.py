@@ -31,6 +31,8 @@ def download(url, local_filename=None):
 
 
 def write_hdf5(data, colors, encoders, fname):
+    print(np.sum(np.isnan(data), axis=1))
+    assert not np.any(np.isnan(data))
     with h5py.File(fname, "w") as hfp:
         hfp["data"] = data
         hfp["data-PCA"] = PCA().fit_transform(data)
@@ -93,8 +95,12 @@ def census1990():
 
     url = "https://web.archive.org/web/20170711094723/https://archive.ics.uci.edu/ml/machine-learning-databases/census1990-mld/USCensus1990.data.txt"
     fname = download(url, "data/census1990.txt")
-    df = pl.read_csv(fname)
-    attributes = ["dAncstry1","dAncstry2","iAvail","iCitizen","iClass","dDepart","iDisabl1","iDisabl2","iEnglish","iFeb55","iFertil","dHispanic","dHour89","dHours","iImmigr","dIncome1","dIncome2","dIncome3","dIncome4","dIncome5","dIncome6","dIncome7","dIncome8","dIndustry","iKorean","iLang1","iLooking","iMarital","iMay75880","iMeans","iMilitary","iMobility","iMobillim","dOccup","iOthrserv","iPerscare","dPOB","dPoverty","dPwgt1","iRagechld","dRearning","iRelat1","iRelat2","iRemplpar","iRiders","iRlabor","iRownchld","dRpincome","iRPOB","iRrelchld","iRspouse","iRvetserv","iSchool","iSept80","iSubfam1","iSubfam2","iTmpabsnt","dTravtime","iVietnam","dWeek89","iWork89","iWorklwk","iWWII","iYearsch","iYearwrk","dYrsserv"]
+    df = pl.read_csv(fname).drop_nulls()
+    attributes = ["dAncstry1","dAncstry2","iAvail","iCitizen","iClass","dDepart",
+                  "iDisabl1","iDisabl2","iEnglish","iFeb55","iFertil","dHispanic",
+                  "dHour89","dHours","iImmigr","dIncome1","dIncome2","dIncome3","dIncome4","dIncome5","dIncome6","dIncome7","dIncome8","dIndustry","iKorean","iLang1","iLooking","iMarital","iMay75880","iMeans","iMilitary","iMobility","iMobillim","dOccup","iOthrserv","iPerscare","dPOB","dPoverty","dPwgt1","iRagechld","dRearning","iRelat1","iRelat2","iRemplpar","iRiders","iRlabor","iRownchld","dRpincome","iRPOB","iRrelchld","iRspouse","iRvetserv","iSchool","iSept80",
+                  "iSubfam1","iSubfam2","iTmpabsnt","dTravtime","iVietnam","dWeek89",
+                  "iWork89","iWorklwk","iWWII","iYearsch","iYearwrk","dYrsserv"]
     colors = ["dAge", 'iSex']
 
     data = df.select(attributes).to_numpy()
@@ -256,7 +262,7 @@ DATASETS = {
     "reuter_50_50": c50,
     "victorian": victorian,
     "bank": bank,
-    "random_dbg": random_dbg
+    # "random_dbg": random_dbg
 }
 
 

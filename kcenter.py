@@ -225,15 +225,15 @@ if __name__ == "__main__":
 
     cplex_path = "/home/matteo/opt/cplex/cplex/bin/x86-64_linux/cplex"
 
-    k = 32
+    k = 2
     delta = 0.0
-    dataset = "adult"
+    dataset = "census1990"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
     n, dims = datasets.dataset_size(dataset)
 
     # Fair
-    tau = int(0.05*n)
+    tau = int(4)
     logging.info("Tau is %d", tau)
     algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
     # algo = KFC(k, cplex_path, seed=2)

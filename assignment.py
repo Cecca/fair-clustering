@@ -586,7 +586,9 @@ def freq_distributor(centers, costs, weights, fairness_constraints, solver):
     k = costs.shape[1]
     n, ncolors = weights.shape
     print(n, ncolors)
+    print(fairness_constraints)
     allcosts = np.sort(np.unique(costs))
+    print("max distance", np.max(allcosts))
 
     def binary_search():
         def relative_difference(high, low):
