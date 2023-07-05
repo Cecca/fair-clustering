@@ -5,7 +5,7 @@ import time
 import pulp
 
 import datasets
-from assignment import weighted_fair_assignment, fair_assignment
+from assignment import weighted_fair_assignment, fair_assignment, freq_distributor
 
 
 class UnfairKCenter(object):
@@ -32,24 +32,6 @@ class UnfairKCenter(object):
         self.centers = centers
         self.assignment = assignment
 
-        # np.random.seed(self.seed)
-        #
-        # centers = [np.random.choice(X.shape[0])]
-        # distances = pairwise_distances(X, X[centers[-1]].reshape(1, -1))
-        # while len(centers) < self.k:
-        #     farthest = np.argmax(distances)
-        #     centers.append(farthest)
-        #     distances = np.minimum(
-        #         pairwise_distances(X, X[centers[-1]].reshape(1, -1)),
-        #         distances
-        #     )
-        # self.centers = np.array(centers)
-        #
-        # self.assignment = np.array([
-        #     np.argmin(pairwise_distances(X[centers], X[x].reshape(1, -1)))
-        #     for x in range(X.shape[0])
-        # ])
-        # assert np.all(self.assignment[centers] == np.arange(self.k))
         end = time.time()
         self.elapsed = end - start
         return self.assignment
@@ -125,10 +107,11 @@ def greedy_minimum_maximum(data, k, return_assignment=True, seed=123, p=None):
 
 
 class CoresetFairKCenter(object):
-    def __init__(self, k, tau, cplex_path=None, seed=42):
+    def __init__(self, k, tau, cplex_path=None, subroutine_name="freq_distributor", seed=42):
         self.k = k
         self.tau = tau
         self.seed = seed
+        self.subroutine_name = subroutine_name
         self.solver_cmd = pulp.CPLEX_CMD(
             path=cplex_path, msg=0) if cplex_path is not None else pulp.COIN_CMD(msg=False)
         logging.info("solver is %s", self.solver_cmd)
@@ -142,7 +125,8 @@ class CoresetFairKCenter(object):
     def attrs(self):
         return {
             "tau": self.tau,
-            "seed": self.seed
+            "seed": self.seed,
+            "subroutine": self.subroutine_name
         }
 
     def additional_metrics(self):
@@ -177,8 +161,9 @@ class CoresetFairKCenter(object):
         #                     filename="coreset-clustering.png")
 
         # Step 3. Find a fair assignment with the centers in the coreset
-        coreset_centers, coreset_assignment = weighted_fair_assignment(
-            centers, costs, weights, fairness_constraints, solver=self.solver_cmd)
+        subroutine = freq_distributor if self.subroutine_name == "freq_distributor" else weighted_fair_assignment
+        coreset_centers, coreset_assignment = subroutine(
+            centers, costs, weights, fairness_constraints, self.solver_cmd)
 
         # Step 4. Assign the input points to the centers found before
         centers, assignment = self.assign_original_points(
@@ -259,18 +244,7 @@ if __name__ == "__main__":
     print("radius", assess.radius(data, centers, assignment))
     print("violation", assess.additive_violations(
         k, colors, assignment, fairness_constraints))
+    print(algo.attrs())
     print(algo.additional_metrics())
     print("time", algo.time())
     viz.plot_clustering(data, centers, assignment, filename="clustering.png")
-
-    # Greedy
-    # print("Greedy ==============")
-    # algo = UnfairKCenter(k)
-    #
-    # assignment = algo.fit_predict(data, colors, fairness_constraints)
-    # centers = algo.centers
-    # print("radius", assess.radius(data, centers, assignment))
-    # print("violation", assess.additive_violations(
-    #     k, colors, assignment, fairness_constraints))
-    # print("time", algo.time())
-    # viz.plot_clustering(data, centers, assignment, filename="greedy.png")

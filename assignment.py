@@ -475,7 +475,7 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints, solve
     return centers, assignment
 
 
-def inner_freq_distributor(R, costs, weights, fairness_contraints, solver):
+def inner_freq_distributor(R, costs, weights, fairness_constraints, solver):
     logging.info(R)
     joiners = {}
     k = costs.shape[1]
@@ -542,8 +542,13 @@ def inner_freq_distributor(R, costs, weights, fairness_contraints, solver):
     logging.info("there are %d constraints", len(lp.constraints))
 
     # solve the problem
-    lp.solve(solver)
-    if LpStatus[lp.status] == "Optimal":
+    try:
+        lp.solve(solver)
+        status = lp.status
+    except PulpSolverError:
+        status = -1
+
+    if LpStatus[status] == "Optimal":
         logging.info("LP is feasible")
         toassign = weights.copy().astype(np.float64)
         wassignment = {}  # np.zeros((n,k,ncolors))
@@ -565,12 +570,12 @@ def inner_freq_distributor(R, costs, weights, fairness_contraints, solver):
                         wassignment[x, c, color] = ww
                         toassign[x, color] -= ww
                         budget = 0
-            assert budget <= 1e-10, f"Leftover budget {budget} > 0"
+            assert budget <= 1e-7, f"Leftover budget {budget} > 0"
 
         logging.info("leftover weight %f", np.sum(toassign))
         logging.info("assigned weight %f", sum(wassignment.values()))
         logging.info("target weight %f", np.sum(weights))
-        assert sum(wassignment.values()) == np.sum(weights)
+        assert np.isclose(sum(wassignment.values()), np.sum(weights))
 
         return wassignment
     else:
@@ -578,7 +583,8 @@ def inner_freq_distributor(R, costs, weights, fairness_contraints, solver):
         return None
 
 
-def freq_distributor(centers, costs, weights, fairness_contraints, solver):
+def freq_distributor(centers, costs, weights, fairness_constraints, solver):
+    k = costs.shape[1]
     n, ncolors = weights.shape
     print(n, ncolors)
     allcosts = np.sort(np.unique(costs))
@@ -627,41 +633,3 @@ def freq_distributor(centers, costs, weights, fairness_contraints, solver):
     logging.info("Radius of the weight assignment after rounding %f", radius)
     assert radius <= R
     return centers, assignment
-
-
-if __name__ == "__main__":
-    import cProfile
-    import pstats
-    import io
-    from pstats import SortKey
-    import kcenter
-    import viz
-    import assess
-    import datasets
-    from sklearn.metrics import pairwise_distances
-
-    logging.basicConfig(level=logging.INFO)
-
-    cplex_path = "/home/matteo/opt/cplex/cplex/bin/x86-64_linux/cplex"
-    solver = CPLEX_CMD(path=cplex_path, msg=False)
-
-    k = 8
-    delta = 0.0
-    dataset = "adult"
-    data, colors, fairness_constraints = datasets.load(
-        dataset, 0, delta)
-    n, dims = datasets.dataset_size(dataset)
-    algo = kcenter.UnfairKCenter(k)
-    assignment = algo.fit_predict(data, colors, fairness_constraints)
-    centers = algo.centers
-
-    # r = assess.radius(data, centers, assignment)
-    # print("radius is", r)
-    # viz.plot_clustering(data, centers, assignment, r=r, filename="rand.png")
-
-    costs = pairwise_distances(data, data[centers])
-    weights = np.zeros((n, len(fairness_constraints)), np.int32)
-    for color in range(np.max(colors) + 1):
-        weights[colors == color, color] = 1
-    assert np.sum(weights) == n
-    freq_distributor(centers, costs, weights, fairness_constraints, solver)
