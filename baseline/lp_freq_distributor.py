@@ -13,7 +13,7 @@ Returns: Lpproblem, status, clusters
 """
 
 
-def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, reps=5):
+def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, d, solver=None, reps=5):
     name_map = {}
 
     def _remap(signature):
@@ -23,8 +23,8 @@ def frequency_distributor_lp(C, S, k, groups, alpha, beta, lamb, solver=None, re
         return name_map[signature]
 
     t_setup = time.time()
-    d = distance_matrix(C, S)
-    logging.info("distance computation %f s", time.time() - t_setup)
+    # d = distance_matrix(C, S)
+    # logging.info("distance computation %f s", time.time() - t_setup)
 
     l = len(groups)
     points = {i: [] for i in range(len(C))}

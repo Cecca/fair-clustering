@@ -1,6 +1,8 @@
 from .lp_freq_distributor import *
 from .shared_utils import *
 import logging
+import pulp
+import numpy as np
 
 
 class KFC(object):
@@ -46,9 +48,15 @@ class KFC(object):
         epsilon = self.epsilon
         F = C
         S_idx = greedy_helper(F, k)
+        logging.info("Computed center positions in %.2f s",
+                     time.time() - start)
         S = F[S_idx]
+        t_distmat = time.time()
+        logging.info("Computed distance matrix in %.2f s",
+                     time.time() - t_distmat)
         d = distance_matrix(C, S)
-        l, r = 0, 2*np.max(d)
+
+        l, r = 0, np.max(d)
         feasible = False
 
         while r-l > epsilon or not feasible:
@@ -57,7 +65,7 @@ class KFC(object):
                 raise Exception("Boom")
             lamb = (l+r)/2
             logging.info(
-                f"Binary search {lamb}: epsilon {epsilon}, r-l={r-l}")
+                f"Binary search {lamb}: epsilon {epsilon}, l={l}, r={r}, r-l={r-l}")
             skip = False
             for i in range(len(C)):
                 if d[i].min() > lamb:
@@ -71,7 +79,7 @@ class KFC(object):
             logging.info("Start frequency distributor with radius %f", lamb)
             fd_start = time.time()
             LP, status, clusters, points = frequency_distributor_lp(
-                C, S, k, groups, alpha, beta, lamb, solver=self.solver_cmd)
+                C, S, k, groups, alpha, beta, lamb, d, solver=self.solver_cmd)
             logging.info("completed frequency distributor in time %f",
                          time.time() - fd_start)
             if p.LpStatus[status] == 'Optimal':
@@ -83,15 +91,15 @@ class KFC(object):
             logging.info("Binary search iteration %f",
                          time.time() - bs_iteration_start)
 
-        end = time.time()
-        self.elapsed = end - start
-
         # Build the assignment
         self.centers = np.array(S_idx)
         self.assignment = np.ones(C.shape[0], np.int32) * 9999
         for c, xs in clusters.items():
             for x in xs:
                 self.assignment[x] = c
+
+        end = time.time()
+        self.elapsed = end - start
 
         assert self.assignment.max() <= k, "there are some unassigned points!"
         return self.assignment
