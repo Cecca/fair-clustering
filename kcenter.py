@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit
+from numba import njit, prange
 from sklearn.metrics import pairwise_distances
 import logging
 import time
@@ -77,19 +77,28 @@ class BeraEtAlKCenter(object):
         return self.assignment
 
 
+@njit(parallel=True)
+def set_eucl(vec, data):
+    """Computes the Euclidean distance between a vector 
+    and a set of vectors, in parallel"""
+    res = np.zeros(data.shape[0])
+    for i in prange(data.shape[0]):
+        res[i] = np.linalg.norm(vec - data[i])
+    return res
+
+
+@njit
 def greedy_minimum_maximum(data, k, seed=123):
     np.random.seed(seed)
     first_center = np.random.choice(data.shape[0])
     centers = np.zeros(k, np.int32)
     centers[0] = first_center
-    distances = pairwise_distances(
-        data, data[first_center].reshape(1, -1))[:, 0]
+    distances = set_eucl(data[first_center], data)
     assignment = np.zeros(data.shape[0], np.int32)
     for idx in range(1, k):
         farthest = np.argmax(distances)
         centers[idx] = farthest
-        distances_to_new_center = pairwise_distances(
-            data, data[farthest].reshape(1, -1))[:, 0]
+        distances_to_new_center = set_eucl(data[farthest], data)
         # update the assignment if we found a closest center
         assignment[distances_to_new_center < distances] = idx
         # update the distances
@@ -97,8 +106,6 @@ def greedy_minimum_maximum(data, k, seed=123):
             distances_to_new_center,
             distances
         )
-
-    # centers = np.array(centers)
 
     return centers, assignment
 
