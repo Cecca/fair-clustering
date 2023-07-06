@@ -76,9 +76,9 @@ class BeraEtAlKCenter(object):
         return self.assignment
 
 
-def greedy_minimum_maximum(data, k, return_assignment=True, seed=123, p=None):
+def greedy_minimum_maximum(data, k, seed=123):
     np.random.seed(seed)
-    first_center = np.random.choice(data.shape[0], p=p)
+    first_center = np.random.choice(data.shape[0])
     centers = [first_center]
     distances = pairwise_distances(
         data, data[centers[-1]].reshape(1, -1))[:, 0]
@@ -100,10 +100,7 @@ def greedy_minimum_maximum(data, k, return_assignment=True, seed=123, p=None):
 
     centers = np.array(centers)
 
-    if return_assignment:
-        return centers, assignment
-    else:
-        return centers
+    return centers, assignment
 
 
 def assign_original_points(k, colors, proxy, coreset_ids, coreset_centers, coreset_assignment):
@@ -183,8 +180,7 @@ class CoresetFairKCenter(object):
         # Step 2. Find the greedy centers in the coreset
         # selection_probabilities = np.sum(weights, axis=1).astype(np.float64)
         # selection_probabilities /= np.sum(selection_probabilities)
-        centers, assignment = greedy_minimum_maximum(
-            coreset, self.k, return_assignment=True, p=None)
+        centers, assignment = greedy_minimum_maximum(coreset, self.k)
         costs = pairwise_distances(coreset, coreset[centers])
 
         # viz.plot_clustering(datasets.load_pca2("4area")[coreset_ids], centers, assignment,
