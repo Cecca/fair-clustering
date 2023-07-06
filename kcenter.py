@@ -1,4 +1,5 @@
 import numpy as np
+from numba import njit
 from sklearn.metrics import pairwise_distances
 import logging
 import time
@@ -79,15 +80,14 @@ class BeraEtAlKCenter(object):
 def greedy_minimum_maximum(data, k, seed=123):
     np.random.seed(seed)
     first_center = np.random.choice(data.shape[0])
-    centers = [first_center]
+    centers = np.zeros(k, np.int32)
+    centers[0] = first_center
     distances = pairwise_distances(
-        data, data[centers[-1]].reshape(1, -1))[:, 0]
+        data, data[first_center].reshape(1, -1))[:, 0]
     assignment = np.zeros(data.shape[0], np.int32)
-    idx = 0
-    while len(centers) < k:
-        idx += 1
+    for idx in range(1, k):
         farthest = np.argmax(distances)
-        centers.append(farthest)
+        centers[idx] = farthest
         distances_to_new_center = pairwise_distances(
             data, data[farthest].reshape(1, -1))[:, 0]
         # update the assignment if we found a closest center
@@ -98,14 +98,12 @@ def greedy_minimum_maximum(data, k, seed=123):
             distances
         )
 
-    centers = np.array(centers)
+    # centers = np.array(centers)
 
     return centers, assignment
 
 
 def assign_original_points(k, colors, proxy, coreset_ids, coreset_centers, coreset_assignment):
-    from numba import njit
-
     @njit
     def inner():
         centers = coreset_ids[coreset_centers]
@@ -178,13 +176,8 @@ class CoresetFairKCenter(object):
         self.time_coreset_s = time.time() - start
 
         # Step 2. Find the greedy centers in the coreset
-        # selection_probabilities = np.sum(weights, axis=1).astype(np.float64)
-        # selection_probabilities /= np.sum(selection_probabilities)
         centers, assignment = greedy_minimum_maximum(coreset, self.k)
         costs = pairwise_distances(coreset, coreset[centers])
-
-        # viz.plot_clustering(datasets.load_pca2("4area")[coreset_ids], centers, assignment,
-        #                     filename="coreset-clustering.png")
 
         # Step 3. Find a fair assignment with the centers in the coreset
         subroutine = freq_distributor if self.subroutine_name == "freq_distributor" else weighted_fair_assignment
@@ -203,7 +196,11 @@ class CoresetFairKCenter(object):
         return assignment
 
     def build_coreset(self, data, tau, colors):
-        point_ids, proxy = greedy_minimum_maximum(data, tau, seed=self.seed)
+        timer = time.time()
+        point_ids, proxy = greedy_minimum_maximum(
+            data, tau, seed=self.seed)
+        logging.info("GMM in %f s", time.time() - timer)
+        timer = time.time()
         self.coreset_points_ids = point_ids
         self.proxy = proxy
         ncolors = np.max(colors) + 1
@@ -212,6 +209,7 @@ class CoresetFairKCenter(object):
             (coreset_points.shape[0], ncolors), dtype=np.int64)
         for color, proxy_idx in zip(colors, proxy):
             coreset_weights[proxy_idx, color] += 1
+        logging.info("assignment in %f s", time.time() - timer)
         return point_ids, coreset_points, proxy, coreset_weights
 
 
@@ -252,7 +250,7 @@ if __name__ == "__main__":
     # viz.plot_dataset(dataset, "dataset.png")
 
     # Fair
-    tau = int(256)
+    tau = int(128)
     logging.info("Tau is %d", tau)
     algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
     # algo = KFC(k, cplex_path, seed=2)
