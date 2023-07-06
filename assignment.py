@@ -365,7 +365,38 @@ def weighted_round_assignment(R, n, k, ncolors, costs, input_assignment, weights
     return output_assignment
 
 
-def fair_assignment(centers, costs, colors, fairness_contraints, solver):
+def max_additive_violation(assignment, fairness_constraints):
+    """
+    assignment: a tensor (n x k x ncolors)
+    """
+    n, k, ncolors = assignment.shape
+    cluster_sizes = np.sum(assignment, axis=(0, 2), dtype=np.int32)
+    assert len(cluster_sizes.shape) == 1
+    assert cluster_sizes.shape[0] == assignment.shape[1], cluster_sizes.shape[0]
+
+    color_cluster_sizes = np.sum(assignment, axis=0, dtype=np.int32)
+    assert color_cluster_sizes.shape == assignment.shape[1:], color_cluster_sizes.shape[0]
+
+    max_violation = 0
+    for c in range(k):
+        csize = cluster_sizes[c]
+        for color in range(ncolors):
+            ccsize = color_cluster_sizes[c, color]
+            beta, alpha = fairness_constraints[color]
+            lower, upper = np.floor(csize*beta), np.ceil(csize*alpha)
+            if ccsize < lower:
+                violation = abs(ccsize - lower)
+                if violation > max_violation:
+                    max_violation = violation
+            if ccsize > upper:
+                violation = abs(ccsize - upper)
+                if violation > max_violation:
+                    max_violation = violation
+
+    return max_violation
+
+
+def fair_assignment(centers, costs, colors, fairness_constraints, solver):
     k = centers.shape[0]
     n = colors.shape[0]
     ncolors = np.max(colors) + 1
@@ -385,7 +416,7 @@ def fair_assignment(centers, costs, colors, fairness_contraints, solver):
             R = allcosts[mid]
             logging.info("R %f", R)
             assignment = inner_fair_assignment(
-                R, costs, colors, fairness_contraints, solver)
+                R, costs, colors, fairness_constraints, solver)
             if low == high:
                 assert assignment is not None
                 return assignment
@@ -631,6 +662,8 @@ def freq_distributor(centers, costs, weights, fairness_constraints, solver):
     assignment = weighted_round_assignment(
         R, n, k, ncolors, costs, wassignment, weights, solver)
     radius = _weighted_assignment_radius(costs, centers, assignment)
+    assert max_additive_violation(assignment, fairness_constraints) <= 7
+
     logging.info("Radius of the weight assignment after rounding %f", radius)
     assert radius <= R
     return centers, assignment

@@ -140,23 +140,26 @@ def greedy_minimum_maximum(data, k, seed=123):
     return centers, assignment
 
 
-def assign_original_points(k, colors, proxy, coreset_ids, coreset_centers, coreset_assignment):
+def assign_original_points(k, colors, proxy, weights, coreset_ids, coreset_centers, coreset_assignment):
     @njit
     def inner():
         centers = coreset_ids[coreset_centers]
-        k = coreset_centers.shape[0]
+        nproxies, k, ncolors = coreset_assignment.shape
 
         assignment = np.ones(colors.shape[0], dtype=np.int64) * 99999999
-        for x, (color, p) in enumerate(zip(colors, proxy)):
-            # look for the first cluster with budget for that color
-            for c in range(k):
-                if coreset_assignment[p, c, color] > 0:
-                    candidates = [i for i in range(
-                        k) if centers[i] == coreset_ids[coreset_centers[c]]]
-                    # assert len(candidates) == 1, candidates
-                    assignment[x] = candidates[0]
-                    coreset_assignment[p, c, color] -= 1
-                    break
+
+        for c in range(k):
+            for p in range(nproxies):
+                if np.any(coreset_assignment[p, c] > 0):
+                    weight_to_distribute = coreset_assignment[p, c].copy()
+                    proxied = np.nonzero(proxy == p)[0]
+                    for x in proxied:
+                        color = colors[x]
+                        if weight_to_distribute[color] > 0 and assignment[x] > k:
+                            assignment[x] = c
+                            weight_to_distribute[color] -= 1
+                    assert np.sum(weight_to_distribute) == 0
+
         return centers, assignment
 
     t_start = time.time()
@@ -223,7 +226,7 @@ class CoresetFairKCenter(object):
 
         # Step 4. Assign the input points to the centers found before
         centers, assignment = assign_original_points(
-            self.k, colors, proxy, coreset_ids, coreset_centers, coreset_assignment)
+            self.k, colors, proxy, weights, coreset_ids, coreset_centers, coreset_assignment)
         self.time_assignment_s = time.time() - start - self.time_coreset_s
 
         end = time.time()
@@ -266,22 +269,22 @@ if __name__ == "__main__":
     def warmup():
         logging.basicConfig(level=logging.WARNING)
         _test_set_eucl()
-        k = 2
+        k = 3
         delta = 0.0
         dataset = "random_dbg"
         data, colors, fairness_constraints = datasets.load(
             dataset, 0, delta)
         n, dims = datasets.dataset_size(dataset)
-        tau = 4
+        tau = 10
         algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
         algo.fit_predict(data, colors, fairness_constraints)
         logging.basicConfig(level=logging.INFO)
 
     warmup()
 
-    k = 64
+    k = 8
     delta = 0.0
-    dataset = "census1990"
+    dataset = "adult"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
     n, dims = datasets.dataset_size(dataset)
@@ -290,7 +293,8 @@ if __name__ == "__main__":
     # Fair
     tau = int(1024)
     logging.info("Tau is %d", tau)
-    algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
+    algo = CoresetFairKCenter(
+        k, tau, cplex_path, seed=2, subroutine_name="freq_distributor")
     # algo = KFC(k, cplex_path, seed=2)
     # algo = BeraEtAlKCenter(k, cplex_path, seed=2)
     print(f"{algo.name()} ==============")
