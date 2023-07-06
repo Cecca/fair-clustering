@@ -106,6 +106,36 @@ def greedy_minimum_maximum(data, k, return_assignment=True, seed=123, p=None):
         return centers
 
 
+def assign_original_points(k, colors, proxy, coreset_ids, coreset_centers, coreset_assignment):
+    from numba import njit
+
+    @njit
+    def inner():
+        centers = coreset_ids[coreset_centers]
+        k = coreset_centers.shape[0]
+
+        assignment = np.ones(colors.shape[0], dtype=np.int64) * 99999999
+        for x, (color, p) in enumerate(zip(colors, proxy)):
+            # look for the first cluster with budget for that color
+            for c in range(k):
+                if coreset_assignment[p, c, color] > 0:
+                    candidates = [i for i in range(
+                        k) if centers[i] == coreset_ids[coreset_centers[c]]]
+                    # assert len(candidates) == 1, candidates
+                    assignment[x] = candidates[0]
+                    coreset_assignment[p, c, color] -= 1
+                    break
+        return centers, assignment
+
+    t_start = time.time()
+    logging.info("Assigning original points")
+    centers, assignment = inner()
+    logging.info("Assignment of original points took %f seconds",
+                 time.time() - t_start)
+    assert assignment.max() <= k, "there are some unassigned points!"
+    return centers, assignment
+
+
 class CoresetFairKCenter(object):
     def __init__(self, k, tau, cplex_path=None, subroutine_name="freq_distributor", seed=42):
         self.k = k
@@ -166,8 +196,8 @@ class CoresetFairKCenter(object):
             centers, costs, weights, fairness_constraints, self.solver_cmd)
 
         # Step 4. Assign the input points to the centers found before
-        centers, assignment = self.assign_original_points(
-            colors, proxy, coreset_ids, coreset_centers, coreset_assignment, self_centers=False)
+        centers, assignment = assign_original_points(
+            self.k, colors, proxy, coreset_ids, coreset_centers, coreset_assignment)
         self.time_assignment_s = time.time() - start - self.time_coreset_s
 
         end = time.time()
@@ -188,29 +218,6 @@ class CoresetFairKCenter(object):
             coreset_weights[proxy_idx, color] += 1
         return point_ids, coreset_points, proxy, coreset_weights
 
-    def assign_original_points(self, colors, proxy, coreset_ids, coreset_centers, coreset_assignment, self_centers=False):
-        logging.info("Assigning original points")
-        centers = coreset_ids[coreset_centers]
-        k = coreset_centers.shape[0]
-
-        assignment = np.ones(colors.shape[0], dtype=np.int64) * 99999999
-        for x, (color, p) in enumerate(zip(colors, proxy)):
-            if self_centers and x in centers:
-                assignment[x] = [i for i in range(k) if centers[i] == x][0]
-            else:
-                # look for the first cluster with budget for that color
-                for c in range(k):
-                    # if (p, c, color) in coreset_assignment:
-                    if coreset_assignment[p, c, color] > 0:
-                        candidates = [i for i in range(
-                            k) if centers[i] == coreset_ids[coreset_centers[c]]]
-                        # assert len(candidates) == 1, candidates
-                        assignment[x] = candidates[0]
-                        coreset_assignment[p, c, color] -= 1
-                        break
-        assert assignment.max() <= k, "there are some unassigned points!"
-        return centers, assignment
-
 
 if __name__ == "__main__":
     import cProfile
@@ -225,16 +232,31 @@ if __name__ == "__main__":
 
     cplex_path = "/home/matteo/opt/cplex/cplex/bin/x86-64_linux/cplex"
 
+    def warmup():
+        logging.basicConfig(level=logging.WARNING)
+        k = 2
+        delta = 0.0
+        dataset = "random_dbg"
+        data, colors, fairness_constraints = datasets.load(
+            dataset, 0, delta)
+        n, dims = datasets.dataset_size(dataset)
+        tau = 4
+        algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
+        algo.fit_predict(data, colors, fairness_constraints)
+        logging.basicConfig(level=logging.INFO)
+
+    warmup()
+
     k = 64
     delta = 0.0
     dataset = "census1990"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
     n, dims = datasets.dataset_size(dataset)
-    viz.plot_dataset(dataset, "dataset.png")
+    # viz.plot_dataset(dataset, "dataset.png")
 
     # Fair
-    tau = int(128)
+    tau = int(256)
     logging.info("Tau is %d", tau)
     algo = CoresetFairKCenter(k, tau, cplex_path, seed=2)
     # algo = KFC(k, cplex_path, seed=2)
@@ -248,4 +270,4 @@ if __name__ == "__main__":
     print(algo.attrs())
     print(algo.additional_metrics())
     print("time", algo.time())
-    viz.plot_clustering(data, centers, assignment, filename="clustering.png")
+    # viz.plot_clustering(data, centers, assignment, filename="clustering.png")

@@ -3,18 +3,12 @@ import logging
 import zipfile
 import os
 import requests
-from numba.typed import List
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.decomposition import PCA
-import umap
 import numpy as np
 import pandas as pd
 import polars as pl
 import h5py
-from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
-import warnings
-warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
-warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 
 
 def download(url, local_filename=None):
@@ -31,7 +25,12 @@ def download(url, local_filename=None):
 
 
 def write_hdf5(data, colors, encoders, fname):
-    print(np.sum(np.isnan(data), axis=1))
+    from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+    import warnings
+    warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
+    warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
+    import umap
+
     assert not np.any(np.isnan(data))
     with h5py.File(fname, "w") as hfp:
         hfp["data"] = data
@@ -277,7 +276,7 @@ DATASETS = {
     "reuter_50_50": c50,
     "victorian": victorian,
     "bank": bank,
-    # "random_dbg": random_dbg
+    "random_dbg": random_dbg
 }
 
 
@@ -299,10 +298,10 @@ def load(name, color_idx, delta=0.0, prefix=None):
             colors = hfp["colors"][:prefix, color_idx]
     unique_colors, color_counts = np.unique(colors, return_counts=True)
     color_proportion = color_counts / np.sum(color_counts)
-    fairness_constraints = List([
+    fairness_constraints = [
         (p * (1-delta), p / (1-delta))
         for p in color_proportion
-    ])
+    ]
     return data, colors, fairness_constraints
 
 
