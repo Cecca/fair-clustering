@@ -44,7 +44,7 @@ def write_clustering(opath, centers, assignment, dataset, algorithm, k, delta, a
         if key in hfp:
             logging.warn(
                 "Name already exists in result file, skipping: %s", key)
-            return
+            return key
         group = hfp.create_group(key)
         group["centers"] = centers
         group["assignment"] = assignment
@@ -171,6 +171,7 @@ def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_
     key = write_clustering(opath, centers, assignment,
                            dataset, algorithm, k, delta, attrs_dict)
     print(f"{algorithm} on {dataset} (k={k}, delta={delta}): t={time_s}s r={radius} violation={violation}")
+    assert key is not None
     with get_db() as db:
         db.execute("""
         INSERT INTO results VALUES (
