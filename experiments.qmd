@@ -6,7 +6,7 @@ execute:
   message: false
 ---
 
-- [ ] Fare gli esperimenti con i due solver
+- [ ] Far capire cosa domina nella complessità
 
 ```{r}
 library(tidyverse)
@@ -59,11 +59,15 @@ load_data <- function() {
 
 results <- load_data()
 dataojs <- results |>
-  select(dataset, k, algorithm, tau, radius, time_s, scaled_radius) |>
+  select(dataset, k, algorithm, tau, radius, time_s, scaled_radius, additive_violation) |>
   group_by(dataset, k, algorithm, tau) |>
-  summarise(across(c(radius, time_s, scaled_radius), mean))
+  summarise(
+    across(c(radius, time_s, scaled_radius), mean),
+    additive_violation = max(additive_violation)
+  )
 ojs_define(data = dataojs)
 ```
+
 
 ```{r}
 dataset_stats() |>
@@ -72,6 +76,8 @@ dataset_stats() |>
   kbl() |>
   kable_styling()
 ```
+
+The following grid of plots provides and overview of the radius/time tradeoff for all algorithms.
 
 ```{r}
 #| column: screen
@@ -85,6 +91,11 @@ results |>
   geom_point() +
   facet_grid(vars(dataset), vars(k))
 ```
+
+This plot instead shows how the radius changes for changing values of `k`.
+Notably, the radius flattens earlier when the fairness is considered.
+One thing to remember is that, as of now, we are aiming to preserve the _exact_ ratios:
+i.e. $\alpha = \beta$, there is no slack in the balancing of each cluster.
 
 ```{r}
 load_data() |>
@@ -108,21 +119,14 @@ load_data() |>
   facet_wrap(vars(dataset), scale="free_y")
 ```
 
-```{r}
-#| fig-cap: Coreset radius at different coreset sizes, scaled as a percentage of the input size
-#| fig-width: 10
-#| column: page
-
-load_data() |>
-  ggplot(aes(coreset_size_frac, coreset_radius, color=factor(k))) +
-  geom_line(data=~drop_na(., coreset_radius)) +
-  scale_x_continuous(limits=c(0,1), labels=scales::percent) +
-  facet_grid(vars(dataset), vars(factor(k)), scales="free")
-```
+Here we take a closer look at the performance of our own algorithm: how does the radius change
+as the coreset becomes larger and larger?
+As expected, it becomes smaller and smaller, approaching the one found by the state 
+of the art algorithms.
 
 ```{r}
-#| column: page
 #| fig-cap: Radius of the solution wrt the coreset size
+#| fig-cap-location: margin
 #| out-width: "100%"
 #| fig-width: 10
 #| fig-height: 10
@@ -146,7 +150,6 @@ radius becomes smaller hence the problem becomes larger.
 
 ```{r}
 #| label: fig-time
-#| column: page
 #| fig-cap: Running time
 #| out-width: "100%"
 #| fig-width: 10
@@ -172,31 +175,46 @@ load_data() |>
   facet_grid(vars(dataset), vars(factor(k)), scales="free")
 ```
 
+```{r}
+#| fig-width: 7
+#| fig-height: 10
+load_data() |>
+  ggplot(aes(x=k, y=additive_violation, color=algorithm)) +
+  geom_point(position="dodge") +
+  scale_x_continuous(trans="log2") +
+  facet_wrap(vars(dataset), scales="free", ncol=2)
+```
+
 ```{ojs}
 viewof dataset = Inputs.radio(new Set(data.dataset), {label: "Dataset", value: "census1990"})
 viewof kval = Inputs.radio(new Set(data.k), {label: "K", value: 2})
 ```
 
 ```{ojs}
-//| column: body
-
+plotdata = transpose(data).filter(r => r.dataset == dataset && r.k == kval)
 Plot.plot({
   color: {legend: true},
+  x: {grid: true},
+  y: {domain: [0, d3.max(plotdata, d => d.time_s)], grid: true},
   marks: [
     Plot.dot(
-      transpose(data).filter(r => r.dataset == dataset && r.k == kval),
+      plotdata,
       {
         x: "radius",
         y: "time_s",
         fill: "algorithm",
-        stroke: "algorithm"
-      })
+        stroke: "algorithm",
+        tip: true
+      }
+    )
   ]
 })
 ```
 
 ```{ojs}
-viewof search = Inputs.search(transpose(data))
+viewof search = Inputs.search(
+  transpose(data).filter(r => r.dataset == dataset && r.k == kval)
+)
 ```
 
 ```{ojs}

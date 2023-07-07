@@ -17,7 +17,7 @@ def plot_clustering(data, centers, assignment, r=None, size=None, filename="clus
 
     for c in cluster:
         cdata = data[assignment == c]
-        plt.scatter(cdata[:, 0], cdata[:, 1], s=1)
+        plt.scatter(cdata[:, 0], cdata[:, 1], s=2)
 
     plt.scatter(data[centers, 0], data[centers, 1],
                 s=200, marker="x", c="black")
@@ -38,13 +38,14 @@ def plot_clustering(data, centers, assignment, r=None, size=None, filename="clus
 
 def plot_dataset(name, filename="dataset.png"):
     import datasets
-    data = datasets.load_pca2(name)
-    if data is None:
-        return
-    plt.figure(figsize=(10, 10))
-    plt.scatter(data[:, 0], data[:, 1])
-    plt.tight_layout()
-    plt.savefig(filename)
+    data, colors = datasets.load_pca2(name)
+    plot_clustering(data, [], colors, filename=filename)
+    # if data is None:
+    #     return
+    # plt.figure(figsize=(10, 10))
+    # plt.scatter(data[:, 0], data[:, 1])
+    # plt.tight_layout()
+    # plt.savefig(filename)
 
 
 if __name__ == "__main__":
@@ -52,9 +53,6 @@ if __name__ == "__main__":
     import sys
     import results
     import os
-
-    # for dataset in datasets.datasets():
-    #     plot_dataset(dataset, f"data/{dataset}.png")
 
     if len(sys.argv) == 3:
         resfile = sys.argv[1]
@@ -69,3 +67,6 @@ if __name__ == "__main__":
                 centers, assignment, dataset = results.read_key(resfile, key)
                 data = datasets.load_pca2(dataset)
                 plot_clustering(data, centers, assignment, filename=img_path)
+    else:
+        for dataset in datasets.datasets():
+            plot_dataset(dataset, f"data/{dataset}.png")

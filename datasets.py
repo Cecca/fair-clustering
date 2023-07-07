@@ -316,7 +316,8 @@ def load_pca2(name):
     fname = DATASETS[name]()
     with h5py.File(fname, "r") as hfp:
         data = hfp["data-PCA"][:, :2]
-    return data
+        colors = hfp["colors"][:, 0]
+    return data, colors
 
 
 def load_umap(name):
