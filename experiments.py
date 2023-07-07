@@ -59,12 +59,12 @@ if __name__ == "__main__":
         algos = [
             kcenter.UnfairKCenter(k),
             # kcenter.BeraEtAlKCenter(k, cplex_path),
-            # KFC(k, cplex_path)
+            KFC(k, cplex_path)
         ] + [
             kcenter.CoresetFairKCenter(
                 k, tau, cplex_path, seed=seed)
             for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k, 512*k, 1024*k, 2048*k]
-            for seed in range(1, 3)
+            for seed in [1]
             if tau <= n
         ]
         for algo in algos:

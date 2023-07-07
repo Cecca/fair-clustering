@@ -282,7 +282,7 @@ DATASETS = {
 
 def datasets():
     """Return all dataset names"""
-    names = list(DATASETS.keys())
+    names = [k for k in DATASETS.keys() if k != "random_dbg"]
     return names
 
 
