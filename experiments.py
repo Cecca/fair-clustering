@@ -51,7 +51,7 @@ if __name__ == "__main__":
         cplex_path = None
 
     ofile = "results.hdf5"
-    ks = [2, 4, 8, 16, 32]
+    ks = [2, 4, 8, 16, 32, 64]
     deltas = [0]  # , 0.1, 0.2]
     all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
