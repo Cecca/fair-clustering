@@ -29,7 +29,7 @@ class UnfairKCenter(object):
     def fit_predict(self, X, _colors_unused, _fairness_constraints_unused):
         start = time.time()
         centers, assignment = greedy_minimum_maximum(
-            X, self.k, return_assignment=True, seed=self.seed)
+            X, self.k, seed=self.seed)
         self.centers = centers
         self.assignment = assignment
 
