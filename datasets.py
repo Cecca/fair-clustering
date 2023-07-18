@@ -33,7 +33,7 @@ def write_hdf5(data, colors, encoders, fname):
 
     assert not np.any(np.isnan(data))
     with h5py.File(fname, "w") as hfp:
-        hfp["data"] = data
+        hfp["data"] = data.astype(np.float64)
         hfp["data-PCA"] = PCA().fit_transform(data)
         if data.shape[0] < 40000:
             hfp["data-UMAP"] = umap.UMAP().fit_transform(data)
@@ -77,7 +77,7 @@ def creditcard():
     colors = ["SEX", "EDUCATION", "MARRIAGE"]
 
     data = df.select(attributes).to_numpy()
-    data = StandardScaler().fit_transform(data)
+    # data = StandardScaler().fit_transform(data)
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
@@ -108,7 +108,7 @@ def census1990():
     colors = ["dAge", 'iSex']
 
     data = df.select(attributes).to_numpy()
-    data = StandardScaler().fit_transform(data)
+    # data = StandardScaler().fit_transform(data)
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
@@ -142,7 +142,7 @@ def adult():
     attributes = ["age", "final-weight", "education-num",
                   "capital-gain", "hours-per-week"]
     data = df.select(attributes).to_numpy()
-    data = StandardScaler().fit_transform(data)
+    # data = StandardScaler().fit_transform(data)
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
@@ -191,7 +191,7 @@ def diabetes():
           .drop_nulls()
           )
     data = df.select(attributes).to_numpy()
-    data = StandardScaler().fit_transform(data)
+    # data = StandardScaler().fit_transform(data)
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
         pl.col("gender").map(
@@ -216,7 +216,7 @@ def _kfc_csv(url, local_fname, ofname, attributes, color_columns, sep=","):
     df = pl.read_csv(fname, separator=sep)
     print(df)
     data = df.select(attributes).to_numpy()
-    data = StandardScaler().fit_transform(data)
+    # data = StandardScaler().fit_transform(data)
     encoders = dict((c, LabelEncoder()) for c in color_columns)
     colors = df.select([
         pl.col(column).map(lambda c: enc.fit_transform(c)).explode()
