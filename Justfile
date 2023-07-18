@@ -1,6 +1,8 @@
+remote := "ceccarello@login.dei.unipd.it:/nfsd/lovelace/ceccarello/fair-clustering"
+
 syncdb:
-  scp ceccarello@login.dei.unipd.it:/nfsd/lovelace/ceccarello/fair-clustering/results.db .
-  scp ceccarello@login.dei.unipd.it:/nfsd/lovelace/ceccarello/fair-clustering/results.hdf5 .
+  scp {{remote}}/results.db .
+  scp {{remote}}/results.hdf5 .
   touch experiments.qmd
 
 update_images:
