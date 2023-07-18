@@ -522,6 +522,9 @@ def inner_freq_distributor(R, costs, weights, fairness_constraints, solver):
 
     for x in range(n):
         reaching_centers = frozenset((costs[x] <= R).nonzero()[0])
+        if len(reaching_centers) == 0:
+            logging.info("Some variables are reached by no centers")
+            return None
         if reaching_centers not in joiners:
             joiners[reaching_centers] = []
         joiners[reaching_centers].append(x)
