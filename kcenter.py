@@ -282,7 +282,7 @@ if __name__ == "__main__":
         algo.fit_predict(data, colors, fairness_constraints)
         logging.basicConfig(level=logging.INFO)
 
-    # warmup()
+    warmup()
 
     k = 32
     delta = 0.0
