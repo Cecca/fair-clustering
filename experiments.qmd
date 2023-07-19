@@ -36,7 +36,7 @@ load_data <- function() {
         from results"
 
   results <- tbl(con, sql(q)) |> 
-    filter(delta == 0) |>
+    filter(delta == 0.2) |>
     inner_join(tbl(con, "dataset_stats")) |>
     collect() |>
     mutate(
@@ -132,7 +132,7 @@ of the art algorithms.
 #| fig-height: 10
 
 load_data() |>
-  ggplot(aes(coreset_size_frac, scaled_radius, color=algorithm)) +
+  ggplot(aes(tau, scaled_radius, color=algorithm)) +
   geom_line(data=~drop_na(., coreset_radius), stat="summary") +
   geom_point(data=~drop_na(., coreset_radius), size=1) +
   geom_hline(
@@ -140,7 +140,7 @@ load_data() |>
     data=~filter(., algorithm != "coreset-fair-k-center")
   ) +
   scale_y_continuous(limits=c(1,NA)) +
-  scale_x_continuous(limits=c(0,1), labels=scales::percent) +
+  # scale_x_continuous(limits=c(0,1), labels=scales::percent) +
   facet_grid(vars(dataset), vars(factor(k)), scales="free")
 ```
 
@@ -163,15 +163,15 @@ filterfn <- function(dat) {
 
 load_data() |>
   ggplot(aes(y=time_s, color=algorithm, fill=algorithm)) +
-  geom_line(aes(x=coreset_size_frac), data=filterfn, stat="summary") +
-  geom_area(aes(x=coreset_size_frac, y=time_s), data=filterfn, alpha=0.2, stat="summary") +
-  geom_area(aes(x=coreset_size_frac, y=coreset_time_s), data=filterfn, stat="summary") +
+  geom_line(aes(x=tau), data=filterfn, stat="summary") +
+  geom_area(aes(x=tau, y=time_s), data=filterfn, alpha=0.2, stat="summary") +
+  geom_area(aes(x=tau, y=coreset_time_s), data=filterfn, stat="summary") +
   # geom_point(data=filterfn, size=1) +
   geom_hline(
     aes(yintercept = time_s, color=algorithm, fill=algorithm),
     data=~filter(., algorithm != "coreset-fair-k-center")
   ) +
-  scale_x_continuous(limits=c(0,1), labels=scales::percent) +
+  # scale_x_continuous(limits=c(0,1), labels=scales::percent) +
   facet_grid(vars(dataset), vars(factor(k)), scales="free")
 ```
 

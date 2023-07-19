@@ -267,6 +267,55 @@ def bank():
     )
 
 
+def hmda():
+    """
+    Home Mortgage Disclosure Act
+    ============================
+
+    Source: https://ffiec.cfpb.gov/data-publication/modified-lar/2022
+    """
+    ofile = "data/hmda.hdf5"
+    if os.path.isfile(ofile):
+        return ofile
+    url = "https://s3.amazonaws.com/cfpb-hmda-public/prod/dynamic-data/combined-mlar/2022/header/2022_combined_mlar_header.zip"
+    local = download(url, "data/hmda.zip")
+    unzipped = "data/2022_combined_mlar_header.txt"
+    if not os.path.isfile(unzipped):
+        with zipfile.ZipFile(local) as fpzip:
+            fpzip.extract("2022_combined_mlar_header.txt", "data")
+
+    attr_cols = ["loan_amount", "total_loan_costs", "origination_charges", "discount_points",
+                 "lender_credits", "interest_rate", "combined_loan_to_value_ratio", "loan_term"]
+    df = pl.scan_csv(unzipped, separator="|",
+                     null_values=["NA", ""],
+                     dtypes=dict((c, "str") for c in attr_cols),
+                     ignore_errors=False).with_columns(
+        pl.col(c).str.replace("Exempt", "0").cast(
+            "f64").fill_null(pl.lit(0)).alias(c)
+        for c in attr_cols
+    )
+    color_col = "applicant_race_1"
+
+    df = df.select([color_col] + attr_cols).drop_nulls().collect()
+
+    # Remove blatant outliers
+    for attr in attr_cols:
+        df = df.filter(
+            pl.col(attr).rank(descending=True) >= 10000
+        )
+    data = df.select(attr_cols).to_numpy()
+    print(data.shape)
+
+    encoders = dict((c, LabelEncoder()) for c in [color_col])
+    colors = df.select(
+        pl.col("applicant_race_1").map(
+            lambda c: encoders["applicant_race_1"].fit_transform(c)).explode(),
+    ).to_numpy()
+    write_hdf5(data, colors, encoders, ofile)
+    os.remove(unzipped)
+    return ofile
+
+
 DATASETS = {
     "adult": adult,
     "diabetes": diabetes,
@@ -276,6 +325,7 @@ DATASETS = {
     "reuter_50_50": c50,
     "victorian": victorian,
     "bank": bank,
+    "hmda": hmda,
     "random_dbg": random_dbg
 }
 

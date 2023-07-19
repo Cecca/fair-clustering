@@ -285,15 +285,15 @@ if __name__ == "__main__":
     warmup()
 
     k = 32
-    delta = 0.0
-    dataset = "creditcard"
+    delta = 0.01
+    dataset = "hmda"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
     n, dims = datasets.dataset_size(dataset)
     # viz.plot_dataset(dataset, "dataset.png")
 
     # Fair
-    tau = int(64)
+    tau = int(k*8)
     logging.info("Tau is %d", tau)
     algo = CoresetFairKCenter(
         k, tau, cplex_path, seed=1, subroutine_name="freq_distributor")
