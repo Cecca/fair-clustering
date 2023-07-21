@@ -47,9 +47,10 @@ class Dummy(object):
         for color in range(ncolors):
             color_points = np.arange(n)[colors == color].copy()
             np.random.shuffle(color_points)
-            slice_size = int(np.ceil(color_points.shape[0] / self.k))
+            slice_size = (color_points.shape[0] + 1) // self.k
             for c in range(self.k):
                 slice = color_points[c*slice_size: (c+1)*slice_size]
+                assert slice.shape[0] > 0, f"cluster {c} slice size: {slice_size} n={n}, ncolors={ncolors} colorpoints: {color_points.shape[0]}"
                 clusters[c].extend(slice)
 
         # Find the center

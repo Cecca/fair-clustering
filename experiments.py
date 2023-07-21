@@ -65,25 +65,25 @@ if __name__ == "__main__":
         cplex_path = None
 
     ofile = "results.hdf5"
-    ks = [2, 4, 8, 16, 32, 64]
-    # ks = [32]
-    deltas = [0.01]
-    # deltas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    # ks = [2, 4, 8, 16, 32]
+    ks = [32]
+    # deltas = [0.01]
+    deltas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
         algos = [
-            kcenter.Dummy(k),
+            # kcenter.Dummy(k),
             # kcenter.UnfairKCenter(k),
             # kcenter.BeraEtAlKCenter(k, cplex_path),
-            # KFC(k, cplex_path)
+            KFC(k, cplex_path)
         ] + [
-            # kcenter.CoresetFairKCenter(
-            #     k, tau, cplex_path, seed=seed)
-            # for tau in [32*k]
-            # # for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k]
-            # for seed in [1]
-            # if tau <= n
+            kcenter.CoresetFairKCenter(
+                k, tau, cplex_path, seed=seed)
+            for tau in [32*k]
+            # for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k]
+            for seed in [1]
+            if tau <= n
         ]
         for algo in algos:
             evaluate(dataset, delta, algo)
