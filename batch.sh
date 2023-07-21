@@ -12,7 +12,7 @@ apptainer exec \
 # 	--bind $(pwd):/work \
 # 	--pwd /work \
 # 	fairclustering.sif \
-# 	python kcenter.py
+# 	python datasets.py
 
 apptainer exec \
 	--bind $(pwd):/work \

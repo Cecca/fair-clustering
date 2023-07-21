@@ -34,11 +34,11 @@ class Dummy(object):
     def fit_predict(self, X, colors, _fairness_constraints_unused):
         start = time.time()
 
-        sq_norms = np.zeros(data.shape[0])
-        for i in range(data.shape[0]):
-            sq_norms[i] = np.dot(data[i], data[i])
+        sq_norms = np.zeros(X.shape[0])
+        for i in range(X.shape[0]):
+            sq_norms[i] = np.dot(X[i], X[i])
 
-        clusters = dict((c, []) for c in range(k))
+        clusters = dict((c, []) for c in range(self.k))
 
         n = X.shape[0]
         ncolors = colors.max() + 1
@@ -47,7 +47,7 @@ class Dummy(object):
         for color in range(ncolors):
             color_points = np.arange(n)[colors == color].copy()
             np.random.shuffle(color_points)
-            slice_size = int(np.ceil(color_points.shape[0] / k))
+            slice_size = int(np.ceil(color_points.shape[0] / self.k))
             for c in range(self.k):
                 slice = color_points[c*slice_size: (c+1)*slice_size]
                 clusters[c].extend(slice)

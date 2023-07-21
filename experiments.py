@@ -40,6 +40,19 @@ def evaluate(dataset, delta, algo):
         results.save_timeout(dataset, algo.name(), k,
                              delta, algo.attrs(), TIMEOUT_SECS)
 
+def warmup(cplex_path):
+    logging.basicConfig(level=logging.WARNING)
+    k = 3
+    delta = 0.0
+    dataset = "random_dbg"
+    data, colors, fairness_constraints = datasets.load(
+        dataset, 0, delta)
+    n, dims = datasets.dataset_size(dataset)
+    tau = 10
+    algo = kcenter.CoresetFairKCenter(k, tau, cplex_path, seed=2)
+    algo.fit_predict(data, colors, fairness_constraints)
+    logging.basicConfig(level=logging.INFO)
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
@@ -47,25 +60,30 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 2:
         cplex_path = sys.argv[1]
+        warmup(cplex_path)
     else:
         cplex_path = None
 
     ofile = "results.hdf5"
     ks = [2, 4, 8, 16, 32, 64]
-    deltas = [0, 0.01, 0.05, 0.1, 0.2]
+    # ks = [32]
+    deltas = [0.01]
+    # deltas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
         algos = [
-            kcenter.UnfairKCenter(k),
+            kcenter.Dummy(k),
+            # kcenter.UnfairKCenter(k),
             # kcenter.BeraEtAlKCenter(k, cplex_path),
-            KFC(k, cplex_path)
+            # KFC(k, cplex_path)
         ] + [
-            kcenter.CoresetFairKCenter(
-                k, tau, cplex_path, seed=seed)
-            for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k, 512*k]
-            for seed in [1]
-            if tau <= n
+            # kcenter.CoresetFairKCenter(
+            #     k, tau, cplex_path, seed=seed)
+            # for tau in [32*k]
+            # # for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k]
+            # for seed in [1]
+            # if tau <= n
         ]
         for algo in algos:
             evaluate(dataset, delta, algo)
