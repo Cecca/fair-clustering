@@ -65,7 +65,7 @@ if __name__ == "__main__":
             if not os.path.isfile(img_path):
                 print("Plotting image for", key)
                 centers, assignment, dataset = results.read_key(resfile, key)
-                data = datasets.load_pca2(dataset)
+                data, colors = datasets.load_pca2(dataset)
                 plot_clustering(data, centers, assignment, filename=img_path)
     else:
         for dataset in datasets.datasets():

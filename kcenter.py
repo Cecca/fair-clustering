@@ -9,6 +9,79 @@ import datasets
 from assignment import weighted_fair_assignment, fair_assignment, freq_distributor
 
 
+class Dummy(object):
+    """
+    Builds a dummy clustering by taking a fraction 1/k of
+    each color set, and building the clusters accordingly.
+    """
+
+    def __init__(self, k, seed=123):
+        self.k = k
+        self.seed = seed
+
+    def attrs(self):
+        return {}
+
+    def additional_metrics(self):
+        return {}
+
+    def name(self):
+        return "dummy"
+
+    def time(self):
+        return self.elapsed
+
+    def fit_predict(self, X, colors, _fairness_constraints_unused):
+        start = time.time()
+
+        sq_norms = np.zeros(data.shape[0])
+        for i in range(data.shape[0]):
+            sq_norms[i] = np.dot(data[i], data[i])
+
+        clusters = dict((c, []) for c in range(k))
+
+        n = X.shape[0]
+        ncolors = colors.max() + 1
+        # Group the points
+        logging.info("grouping the points")
+        for color in range(ncolors):
+            color_points = np.arange(n)[colors == color].copy()
+            np.random.shuffle(color_points)
+            slice_size = int(np.ceil(color_points.shape[0] / k))
+            for c in range(self.k):
+                slice = color_points[c*slice_size: (c+1)*slice_size]
+                clusters[c].extend(slice)
+
+        # Find the center
+        logging.info("finding the centers")
+        centers = []
+        assignment = np.zeros(X.shape[0], dtype=np.int32)
+        for (id, cluster) in clusters.items():
+            assignment[cluster] = id
+            cluster_points = X[cluster]
+            # look for the best center
+            dists = np.zeros(cluster_points.shape[0])
+            smallest_radius = np.infty
+            center_id = None
+            for candidate in cluster:
+                set_eucl(X[candidate], cluster_points,
+                         sq_norms[candidate], sq_norms[cluster], dists)
+                radius = dists.max()
+                if radius < smallest_radius:
+                    smallest_radius = radius
+                    center_id = candidate
+            logging.info(
+                f"center for cluster {id} id {center_id} with radius {smallest_radius}")
+            centers.append(center_id)
+
+        self.centers = np.array(centers)
+        self.assignment = assignment
+
+        end = time.time()
+        self.elapsed = end - start
+        return self.assignment
+
+
 class UnfairKCenter(object):
     def __init__(self, k, seed=123):
         self.k = k
@@ -286,7 +359,7 @@ if __name__ == "__main__":
 
     k = 32
     delta = 0.01
-    dataset = "hmda"
+    dataset = "census1990"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
     n, dims = datasets.dataset_size(dataset)
@@ -295,8 +368,9 @@ if __name__ == "__main__":
     # Fair
     tau = int(k*8)
     logging.info("Tau is %d", tau)
-    algo = CoresetFairKCenter(
-        k, tau, cplex_path, seed=1, subroutine_name="freq_distributor")
+    algo = Dummy(k, seed=2)
+    # algo = CoresetFairKCenter(
+    #     k, tau, cplex_path, seed=1, subroutine_name="freq_distributor")
     # algo = KFC(k, cplex_path, seed=2)
     # algo = BeraEtAlKCenter(k, cplex_path, seed=2)
     print(f"{algo.name()} ==============")
