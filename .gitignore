@@ -12,3 +12,7 @@ fairclustering.sif
 slurm-*.out
 coreset-clustering.png
 *.log
+coreset-fair-k-center.png
+dummy.png
+kfc.png
+figs

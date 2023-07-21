@@ -68,7 +68,7 @@ def inner_fair_assignment(R, costs, colors, fairness_constraints, solver, intege
         return None
 
 
-def inner_weighted_fair_assignment(R, costs, weights, fairness_constraints, solver, integer=False):
+def inner_weighted_fair_assignment(R, costs, weights, fairness_constraints, solver, centers, integer=False):
     t_setup_start = time.time()
     vartype = "Integer" if integer else "Continuous"
     n, k = costs.shape
@@ -477,7 +477,7 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints, solve
             R = allcosts[mid]
             logging.info("R %f", R)
             assignment = inner_weighted_fair_assignment(
-                R, costs, weights, fairness_contraints, solver)
+                R, costs, weights, fairness_contraints, solver, centers)
             if low == high:
                 return assignment, R
             if assignment is None:
@@ -506,7 +506,7 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints, solve
     return centers, assignment
 
 
-def inner_freq_distributor(R, costs, weights, fairness_constraints, solver):
+def inner_freq_distributor(R, costs, weights, fairness_constraints, centers_ids, solver):
     logging.info(R)
     joiners = {}
     k = costs.shape[1]
@@ -541,7 +541,14 @@ def inner_freq_distributor(R, costs, weights, fairness_constraints, solver):
             joiner_weight = np.sum(weights[xs, color])
             if joiner_weight > 0:
                 for c in joiner_centers:
+                    # cid = centers_ids[c]
                     vname = var_name(joiner_centers, c, color)
+                    # if cid in xs and weights[cid, color] > 0:
+                    #     lb = 1 / weights[cid].sum()
+                    # else:
+                    #     lb = 0
+                    #     # print(
+                    #     #     f"center {cid} in joiner {vname} with weights {weights[cid]}")
                     v = LpVariable(vname, 0)
                     vars[joiner_centers, c, color] = v
                     joiner_vars.append(v)
@@ -639,7 +646,7 @@ def freq_distributor(centers, costs, weights, fairness_constraints, solver):
             R = allcosts[mid]
             logging.info("R %f", R)
             assignment = inner_freq_distributor(
-                R, costs, weights, fairness_constraints, solver)
+                R, costs, weights, fairness_constraints, centers, solver)
             if low == high:
                 assert assignment is not None
                 return assignment, R

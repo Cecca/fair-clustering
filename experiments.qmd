@@ -6,13 +6,36 @@ execute:
   message: false
 ---
 
-- [ ] Far capire cosa domina nella complessità
+Crucial observation: there are some clusters where their cluster center is not contained in the cluster
+itself. 
+As a particular case, there are some clusters that are emtpy,
+making the budget of clusters underutilized.
 
 ```{r}
 library(tidyverse)
 library(ggpattern)
 library(kableExtra)
 theme_set(theme_bw() + theme(legend.position="bottom"))
+
+theme_paper <- function() {
+  axis_line <- element_line(linewidth=0.1, color="black")
+  theme_minimal() +
+    theme(
+      legend.position="bottom",
+      axis.line.x.bottom = axis_line,
+      axis.line.y.left = axis_line
+    )
+}
+
+scale_algorithm <- function() {
+  scale_color_manual(values = c(
+    "coreset" = "#5778a4",
+    "KFC" = "#e49444",
+    "unfair" = "#d1615d",
+    "Bera-et-al" = "#85b6b2",
+    "dummy" = "black"
+  ))
+}
 
 imgdir <- "imgs"
 
@@ -27,7 +50,7 @@ dataset_stats <- function() {
   stats
 }
 
-load_data <- function() {
+load_data <- function(delta_val = 0.01) {
   con <- DBI::dbConnect(RSQLite::SQLite(), "results.db")
 
   q <- "select *, json_extract(params, '$.tau') / k as tau,
@@ -36,10 +59,16 @@ load_data <- function() {
         from results"
 
   results <- tbl(con, sql(q)) |> 
-    filter(delta == 0.2) |>
     inner_join(tbl(con, "dataset_stats")) |>
     collect() |>
     mutate(
+      algorithm = case_when(
+        algorithm == "coreset-fair-k-center" ~ "coreset",
+        algorithm == "kfc-k-center" ~ "KFC",
+        algorithm == "unfair-k-center" ~ "unfair",
+        algorithm == "bera-et-al-k-center" ~ "Bera-et-al",
+        T ~ algorithm
+      ),
       timeout_s = if_else(time_s > 30*60, 30*60, timeout_s),
       timed_out = !is.na(timeout_s),
       time_s = if_else(timed_out, timeout_s, time_s),
@@ -52,6 +81,11 @@ load_data <- function() {
     group_by(dataset, k) |>
     mutate(scaled_radius = radius / min(radius, na.rm=T)) |>
     ungroup()
+
+  if (!is.na(delta_val)) {
+    message(paste("filtering by delta=", delta_val))
+    results <- filter(results, delta == delta_val)
+  }
 
   DBI::dbDisconnect(con)
   results
@@ -101,16 +135,16 @@ i.e. $\alpha = \beta$, there is no slack in the balancing of each cluster.
 load_data() |>
   mutate(tau = if_else(is.na(tau), 0, tau)) |>
   ggplot(aes(k, radius, color=algorithm)) +
-  geom_line(data=~filter(., algorithm != "coreset-fair-k-center")) +
-  geom_point(data=~filter(., algorithm != "coreset-fair-k-center")) +
+  geom_line(data=~filter(., algorithm != "coreset")) +
+  geom_point(data=~filter(., algorithm != "coreset")) +
   geom_line(
-    data=~filter(., algorithm == "coreset-fair-k-center"),
+    data=~filter(., algorithm == "coreset"),
     mapping=aes(linetype=factor(tau)),
     stat="summary",
     fun=mean
   ) +
   geom_point(
-    data=~filter(., algorithm == "coreset-fair-k-center"),
+    data=~filter(., algorithm == "coreset"),
     mapping=aes(shape=factor(tau)),
     stat="summary",
     fun=mean
@@ -137,7 +171,7 @@ load_data() |>
   geom_point(data=~drop_na(., coreset_radius), size=1) +
   geom_hline(
     aes(yintercept = scaled_radius, color=algorithm),
-    data=~filter(., algorithm != "coreset-fair-k-center")
+    data=~filter(., algorithm != "coreset")
   ) +
   scale_y_continuous(limits=c(1,NA)) +
   # scale_x_continuous(limits=c(0,1), labels=scales::percent) +
@@ -169,7 +203,7 @@ load_data() |>
   # geom_point(data=filterfn, size=1) +
   geom_hline(
     aes(yintercept = time_s, color=algorithm, fill=algorithm),
-    data=~filter(., algorithm != "coreset-fair-k-center")
+    data=~filter(., algorithm != "coreset")
   ) +
   # scale_x_continuous(limits=c(0,1), labels=scales::percent) +
   facet_grid(vars(dataset), vars(factor(k)), scales="free")
@@ -220,5 +254,89 @@ viewof search = Inputs.search(
 ```{ojs}
 Inputs.table(search)
 ```
+
+## Plots for the paper
+
+Here we look at the tradeoff between radius and how much time is required to achieve it
+
+```{r}
+load_data() |>
+  filter(k == 32) |>
+  arrange(dataset, k, algorithm, tau) |>
+  ggplot(aes(scaled_radius, time_s, color=algorithm, shape=algorithm)) +
+  geom_point() +
+  scale_algorithm() +
+  facet_wrap(vars(dataset), scales="free") +
+  theme_paper()
+ggsave("figs/time-vs-radius-k32.png", dpi=300, width=8, height=8)
+```
+
+Now we look at the effect of changing the size of the coreset on the radius, for a fixed value of $k$.
+
+```{r}
+load_data() |>
+  filter(k == 32) |>
+  mutate(coreset_size = tau * k) |>
+  ggplot(aes(x=coreset_size, y=scaled_radius, color=algorithm)) +
+  geom_point(data = ~filter(., !is.na(tau))) +
+  geom_line(data = ~filter(., !is.na(tau))) +
+  geom_hline(
+    aes(yintercept=scaled_radius, color=algorithm),
+    data = ~filter(., is.na(tau))
+  ) +
+  scale_x_continuous(trans="log2") +
+  scale_algorithm() +
+  facet_wrap(vars(dataset), scales="free_y", ncol=3) +
+  labs(
+    x = "coreset size",
+    y = "radius (scaled by the unfair clustering radius)"
+  ) +
+  theme_paper()
+ggsave("figs/tau-radius-k32.png", dpi=300, width=8, height=8)
+```
+
+The following plot is the same, with the time being the dependent variable On
+`reuter_50_50` we see a slow performance because there are 50 colors, hence
+there are many replicas of the same coreset point.
+
+```{r}
+load_data(delta_val=0.01) |>
+  filter(k == 32) |>
+  mutate(coreset_size = tau * k) |>
+  ggplot(aes(x=coreset_size, y=time_s, color=algorithm)) +
+  geom_point(data = ~filter(., !is.na(tau))) +
+  geom_line(data = ~filter(., !is.na(tau))) +
+  geom_hline(
+    aes(yintercept=time_s, color=algorithm),
+    data = ~filter(., is.na(tau))
+  ) +
+  scale_x_continuous(trans="log2") +
+  scale_algorithm() +
+  facet_wrap(vars(dataset), scales="free_y", ncol=3) +
+  labs(
+    x = "coreset size",
+    y = "time (seconds)"
+  ) +
+  theme_paper()
+ggsave("figs/tau-time-k32.png", dpi=300, width=8, height=8)
+```
+
+How does the tolerance $\delta$ change the radius?
+
+```{r}
+load_data(delta_val=NA) |>
+  filter(k == 32) |>
+  # filter(algorithm != "unfair") |>
+  filter(is.na(tau) | ( tau == 32 )) |>
+  ggplot(aes(x=delta, y=scaled_radius, color=algorithm)) +
+  geom_point() +
+  geom_line() +
+  scale_algorithm() +
+  facet_wrap(vars(dataset), scales="free_y") +
+  theme_paper()
+```
+
+
+
 
 

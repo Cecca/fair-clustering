@@ -9,6 +9,15 @@ import datasets
 import results
 
 
+def cluster_sizes(centers, assignment):
+    k = centers.shape[0]
+    sizes = [
+        np.flatnonzero(assignment == i).shape[0]
+        for i in range(k)
+    ]
+    return sizes
+
+
 def radius(data, centers, assignment, all=False):
     k = centers.shape[0]
     dists = paired_distances(

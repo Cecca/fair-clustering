@@ -9,6 +9,53 @@ import datasets
 from assignment import weighted_fair_assignment, fair_assignment, freq_distributor
 
 
+@njit
+def find_best_center(data, cluster, sq_norms):
+    """Given a dataset, the norm of the vectors therein, and a cluster (defined as a list of point IDs),
+    return the point of the cluster that minimizes the radius."""
+    assert cluster.shape[0] > 0
+    cluster_points = data[cluster]
+    # look for the best center
+    dists = np.zeros(cluster_points.shape[0])
+    smallest_radius = np.infty
+    center_id = None
+    for candidate in cluster:
+        set_eucl(data[candidate], cluster_points,
+                 sq_norms[candidate], sq_norms[cluster], dists)
+        radius = dists.max()
+        if radius < smallest_radius:
+            smallest_radius = radius
+            center_id = candidate
+    assert center_id is not None
+    return center_id, smallest_radius
+
+
+@njit
+def relocate_centers(data, centers, assignment, k):
+    sq_norms = np.zeros(data.shape[0])
+    for i in range(data.shape[0]):
+        sq_norms[i] = np.dot(data[i], data[i])
+
+    for i in range(k):
+        cluster = np.flatnonzero(assignment == i)
+        if cluster.shape[0] > 0:
+            # assert centers[i] in cluster
+            dists = np.zeros(cluster.shape[0])
+            set_eucl(data[centers[i]], data[cluster],
+                     sq_norms[centers[i]], sq_norms[cluster], dists)
+            orig_radius = dists.max()
+            # only relocate centers of non-empty clusters
+            # A cluster may not even contain its purported center because of the fairness constraints:
+            # an empty cluster always satisfies the fairness constraints trivially
+            new_center, radius = find_best_center(data, cluster, sq_norms)
+            # , f"original {float(orig_radius)} new radius {float(radius)}"
+            if radius <= orig_radius:
+                centers[i] = new_center
+            else:
+                print(
+                    f"new radius {float(radius)} is larger than the old one {float(orig_radius)}. Is the cluster center in the cluster? {centers[i] in cluster}")
+
+
 class Dummy(object):
     """
     Builds a dummy clustering by taking a fraction 1/k of
@@ -59,21 +106,7 @@ class Dummy(object):
         assignment = np.zeros(X.shape[0], dtype=np.int32)
         for (id, cluster) in clusters.items():
             assignment[cluster] = id
-            cluster_points = X[cluster]
-            # look for the best center
-            dists = np.zeros(cluster_points.shape[0])
-            smallest_radius = np.infty
-            center_id = None
-            for candidate in cluster:
-                set_eucl(X[candidate], cluster_points,
-                         sq_norms[candidate], sq_norms[cluster], dists)
-                radius = dists.max()
-                if radius < smallest_radius:
-                    smallest_radius = radius
-                    center_id = candidate
-            logging.info(
-                f"center for cluster {id} id {center_id} with radius {smallest_radius}")
-            centers.append(center_id)
+            centers.append(find_best_center(X, np.array(cluster), sq_norms)[0])
 
         self.centers = np.array(centers)
         self.assignment = assignment
@@ -214,10 +247,14 @@ def greedy_minimum_maximum(data, k, seed=123):
 
 
 def assign_original_points(k, colors, proxy, weights, coreset_ids, coreset_centers, coreset_assignment):
+    import assess
+
     @njit
     def inner():
-        centers = coreset_ids[coreset_centers]
+        # coreset_ids[coreset_centers]
         nproxies, k, ncolors = coreset_assignment.shape
+        # centers = np.ones(k, dtype=np.int32) * 99999999
+        centers = coreset_ids[coreset_centers]
 
         assignment = np.ones(colors.shape[0], dtype=np.int64) * 99999999
 
@@ -243,6 +280,11 @@ def assign_original_points(k, colors, proxy, weights, coreset_ids, coreset_cente
     centers, assignment = inner()
     logging.info("Assignment of original points took %f seconds",
                  time.time() - t_start)
+    # check that centers are assigned to their own cluster
+    # print("centers assignment", assignment[centers])
+    # print("cluster sizes     ", assess.cluster_sizes(centers, assignment))
+    # for i, c in enumerate(centers):
+    #     assert assignment[c] == i
     assert assignment.max() <= k, "there are some unassigned points!"
     return centers, assignment
 
@@ -278,6 +320,7 @@ class CoresetFairKCenter(object):
         return {
             "time_coreset_s": self.time_coreset_s,
             "time_assignment_s": self.time_assignment_s,
+            "coreset_size": self.coreset_size,
             "coreset_radius": coreset_radius
         }
 
@@ -290,6 +333,8 @@ class CoresetFairKCenter(object):
         coreset_ids, coreset, proxy, weights = self.build_coreset(
             X, self.tau, colors)
         self.time_coreset_s = time.time() - start
+        self.coreset_size = np.flatnonzero(weights).shape[0]
+        print(f"coreset size {self.coreset_size}")
 
         # Step 2. Find the greedy centers in the coreset
         centers, assignment = greedy_minimum_maximum(coreset, self.k)
@@ -303,7 +348,13 @@ class CoresetFairKCenter(object):
         # Step 4. Assign the input points to the centers found before
         centers, assignment = assign_original_points(
             self.k, colors, proxy, weights, coreset_ids, coreset_centers, coreset_assignment)
+
+        # Step 5. (optional, slow) Find better center locations
+        # relocate_centers(X, centers, assignment, self.k)
         self.time_assignment_s = time.time() - start - self.time_coreset_s
+        print("centers ", centers)
+        print("radius  ", assess.radius(X, centers, assignment, all=True))
+        print("size    ", assess.cluster_sizes(centers, assignment))
 
         end = time.time()
         self.elapsed = end - start
@@ -356,31 +407,33 @@ if __name__ == "__main__":
         algo.fit_predict(data, colors, fairness_constraints)
         logging.basicConfig(level=logging.INFO)
 
-    warmup()
+    # warmup()
 
     k = 32
     delta = 0.01
-    dataset = "census1990"
+    dataset = "4area"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
     n, dims = datasets.dataset_size(dataset)
     # viz.plot_dataset(dataset, "dataset.png")
 
     # Fair
-    tau = int(k*8)
+    tau = int(k*2)
     logging.info("Tau is %d", tau)
-    algo = Dummy(k, seed=2)
-    # algo = CoresetFairKCenter(
-    #     k, tau, cplex_path, seed=1, subroutine_name="freq_distributor")
+    algo = Dummy(k)
+    algo = CoresetFairKCenter(
+        k, tau, cplex_path, seed=1, subroutine_name="freq_distributor")
     # algo = KFC(k, cplex_path, seed=2)
     # algo = BeraEtAlKCenter(k, cplex_path, seed=2)
     print(f"{algo.name()} ==============")
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
     print("radius", assess.radius(data, centers, assignment))
+    print("cluster sizes", assess.cluster_sizes(centers, assignment))
     print("violation", assess.additive_violations(
         k, colors, assignment, fairness_constraints))
     print(algo.attrs())
     print(algo.additional_metrics())
     print("time", algo.time())
-    # viz.plot_clustering(data, centers, assignment, filename="clustering.png")
+    viz.plot_clustering(data, centers, assignment,
+                        filename=f"{algo.name()}.png")
