@@ -355,6 +355,13 @@ def load(name, color_idx, delta=0.0, prefix=None):
     return data, colors, fairness_constraints
 
 
+def dataset_ncolors(name):
+    fname = DATASETS[name]()
+    logging.debug("Opening %s", fname)
+    with h5py.File(fname, "r") as hfp:
+        return hfp["colors"].max() + 1
+
+
 def dataset_size(name):
     fname = DATASETS[name]()
     logging.debug("Opening %s", fname)

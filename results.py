@@ -102,6 +102,15 @@ def get_db():
             n            INT,
             dimensions   INT
         );
+        """,
+        """
+        DROP TABLE dataset_stats;
+        CREATE TABLE dataset_stats (
+            dataset      TEXT PRIMARY KEY,
+            n            INT,
+            dimensions   INT,
+            ncolors      INT
+        );
         """
     ]
     dbver = db.execute("PRAGMA user_version").fetchone()[0]
@@ -114,12 +123,14 @@ def get_db():
     # Add dataset stats
     for dataset in datasets.datasets():
         n, dim = datasets.dataset_size(dataset)
+        ncolors = datasets.dataset_ncolors(dataset)
         db.execute(
-            "INSERT INTO dataset_stats VALUES (:dataset, :n, :dim) ON CONFLICT DO NOTHING",
+            "INSERT INTO dataset_stats VALUES (:dataset, :n, :dim, :ncolors) ON CONFLICT DO NOTHING",
             {
                 "dataset": dataset,
                 "n": n,
-                "dim": dim
+                "dim": dim,
+                "ncolors": ncolors
             }
         )
 
