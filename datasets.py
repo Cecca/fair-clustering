@@ -359,7 +359,7 @@ def dataset_ncolors(name):
     fname = DATASETS[name]()
     logging.debug("Opening %s", fname)
     with h5py.File(fname, "r") as hfp:
-        return hfp["colors"].max() + 1
+        return int(hfp["colors"][:].max() + 1)
 
 
 def dataset_size(name):
