@@ -41,8 +41,28 @@ def write_hdf5(data, colors, encoders, fname):
             warnings.warn("Dataset too large, skipping UMAP mapping")
         hfp["colors"] = colors
         for k in encoders:
-            hfp["colors"].attrs[f"encoding-{k}"] = encoders[k].classes_.astype(
-                bytes)
+            if hasattr(encoders[k], "classes_"):
+                clss = encoders[k].classes_.astype(bytes)
+            else:
+                clss = encoders[k]
+            hfp["colors"].attrs[f"encoding-{k}"] = clss
+
+
+def standardize(dataset_fn):
+    def inner():
+        data_name = dataset_fn()
+        oname = data_name.replace(".hdf5", ".standardized.hdf5")
+        if os.path.isfile(oname):
+            return oname
+        with h5py.File(data_name, "r") as hfp:
+            data = hfp["data"][:]
+            colors = hfp["colors"][:]
+            encoders = dict((k, v) for k, v in hfp["colors"].attrs.items()
+                            if k.startswith("encoding"))
+        data = StandardScaler().fit_transform(data)
+        write_hdf5(data, colors, encoders, oname)
+        return oname
+    return inner
 
 
 def random_dbg():
@@ -328,6 +348,10 @@ DATASETS = {
     "hmda": hmda,
     "random_dbg": random_dbg
 }
+
+# Add standardized datasets
+for dataset in list(DATASETS.keys()):
+    DATASETS[f"{dataset}-std"] = standardize(DATASETS[dataset])
 
 
 def datasets():
