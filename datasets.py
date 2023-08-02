@@ -339,24 +339,24 @@ def hmda():
 DATASETS = {
     "adult": adult,
     "diabetes": diabetes,
-    "census1990": census1990,
+    # "census1990": census1990,
     "creditcard": creditcard,
     "4area": four_area,
     "reuter_50_50": c50,
     "victorian": victorian,
     "bank": bank,
-    "hmda": hmda,
+    # "hmda": hmda,
     "random_dbg": random_dbg
 }
 
-# Add standardized datasets
-for dataset in list(DATASETS.keys()):
-    DATASETS[f"{dataset}-std"] = standardize(DATASETS[dataset])
+## Add standardized datasets
+# for dataset in list(DATASETS.keys()):
+#     DATASETS[f"{dataset}-std"] = standardize(DATASETS[dataset])
 
 
 def datasets():
     """Return all dataset names"""
-    names = [k for k in DATASETS.keys() if k != "random_dbg"]
+    names = [k for k in DATASETS.keys() if k != "random_dbg" and k != "random_dbg-std"]
     return names
 
 

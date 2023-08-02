@@ -8,11 +8,11 @@ apptainer exec \
 	fairclustering.sif \
 	python results.py results.hdf5
 
-# apptainer exec \
-# 	--bind $(pwd):/work \
-# 	--pwd /work \
-# 	fairclustering.sif \
-# 	python datasets.py
+apptainer exec \
+	--bind $(pwd):/work \
+	--pwd /work \
+	fairclustering.sif \
+	python datasets.py
 
 apptainer exec \
 	--bind $(pwd):/work \

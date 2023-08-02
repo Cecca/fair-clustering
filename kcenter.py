@@ -352,9 +352,6 @@ class CoresetFairKCenter(object):
         # Step 5. (optional, slow) Find better center locations
         # relocate_centers(X, centers, assignment, self.k)
         self.time_assignment_s = time.time() - start - self.time_coreset_s
-        print("centers ", centers)
-        print("radius  ", assess.radius(X, centers, assignment, all=True))
-        print("size    ", assess.cluster_sizes(centers, assignment))
 
         end = time.time()
         self.elapsed = end - start
