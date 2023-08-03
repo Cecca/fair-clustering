@@ -336,8 +336,35 @@ def hmda():
     return ofile
 
 
+def athlete():
+    ofile = "data/athlete.hdf5"
+    if os.path.isfile(ofile):
+        return ofile
+    url = "https://github.com/rgriff23/Olympic_history/raw/master/data/athlete_events.csv"
+    local = download(url, "data/athlete.csv")
+
+    attributes = ["Age", "Height", "Weight"]
+    colors = ["Sex"]
+
+    df = pl.read_csv(local, null_values=["", "NA"]).select(
+        attributes + colors).drop_nulls()
+
+    data = df.select(attributes).to_numpy()
+
+    encoders = dict((c, LabelEncoder()) for c in colors)
+    colors = df.select(
+        pl.col("Sex").map(
+            lambda c: encoders["Sex"].fit_transform(c)).explode()
+    ).to_numpy()
+
+    write_hdf5(data, colors, encoders, ofile)
+
+    return ofile
+
+
 DATASETS = {
     "adult": adult,
+    "athlete": athlete,
     "diabetes": diabetes,
     # "census1990": census1990,
     "creditcard": creditcard,
@@ -349,14 +376,15 @@ DATASETS = {
     "random_dbg": random_dbg
 }
 
-## Add standardized datasets
+# Add standardized datasets
 # for dataset in list(DATASETS.keys()):
 #     DATASETS[f"{dataset}-std"] = standardize(DATASETS[dataset])
 
 
 def datasets():
     """Return all dataset names"""
-    names = [k for k in DATASETS.keys() if k != "random_dbg" and k != "random_dbg-std"]
+    names = [k for k in DATASETS.keys() if k != "random_dbg" and k !=
+             "random_dbg-std"]
     return names
 
 
