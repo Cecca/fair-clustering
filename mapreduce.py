@@ -17,6 +17,7 @@ class MRCoresetFairKCenter(object):
         self.subroutine_name = subroutine_name
         self.solver_cmd = pulp.CPLEX_CMD(
             path=cplex_path, msg=False) if cplex_path is not None else pulp.COIN_CMD(msg=False)
+        self.parallelism = int(master.replace("local[", "").replace("]", ""))
 
     def name(self):
         return "mr-coreset-fair-k-center"
@@ -153,7 +154,7 @@ if __name__ == "__main__":
 
     tau = int(k*20)
     logging.info("Tau is %d", tau)
-    algo = MRCoresetFairKCenter(k, tau, master, cplex_path)
+    # algo = MRCoresetFairKCenter(k, tau, master, cplex_path)
     algo = BeraEtAlMRFairKCenter(k, master, cplex_path)
 
     assignment = algo.fit_predict(data, colors, fairness_constraints)
