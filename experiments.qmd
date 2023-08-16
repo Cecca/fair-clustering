@@ -11,19 +11,23 @@ itself.
 As a particular case, there are some clusters that are emtpy,
 making the budget of clusters underutilized.
 
-```{r}
+```{r definitions}
 library(tidyverse)
 library(ggpattern)
 library(kableExtra)
 theme_set(theme_bw() + theme(legend.position="bottom"))
 
 theme_paper <- function() {
-  axis_line <- element_line(linewidth=0.1, color="black")
-  theme_minimal() +
+  # axis_line <- element_line(linewidth=0.1, color="black")
+  # theme_minimal() +
+  #   theme(
+  #     legend.position="bottom",
+  #     axis.line.x.bottom = axis_line,
+  #     axis.line.y.left = axis_line
+  #   )
+  theme_bw() +
     theme(
-      legend.position="bottom",
-      axis.line.x.bottom = axis_line,
-      axis.line.y.left = axis_line
+      legend.position = "bottom"
     )
 }
 
@@ -56,12 +60,17 @@ load_data <- function(delta_val = 0.01) {
   q <- "select *, json_extract(params, '$.tau') / k as tau,
         cast(additional_metrics -> '$.coreset_radius' as real) as coreset_radius,
         cast(additional_metrics -> '$.time_coreset_s' as real) as coreset_time_s
-        from results"
+        from results
+        where dataset not like '%std'"
 
   results <- tbl(con, sql(q)) |> 
     inner_join(tbl(con, "dataset_stats")) |>
     collect() |>
     mutate(
+      dataset = case_when(
+        dataset == "reuter_50_50" ~ "reuter",
+        T ~ dataset
+      ),
       algorithm = case_when(
         algorithm == "coreset-fair-k-center" ~ "coreset",
         algorithm == "kfc-k-center" ~ "KFC",
@@ -69,6 +78,13 @@ load_data <- function(delta_val = 0.01) {
         algorithm == "bera-et-al-k-center" ~ "Bera-et-al",
         T ~ algorithm
       ),
+      algorithm = factor(algorithm, ordered=TRUE, levels=c(
+        "unfair", 
+        "Bera-et-al", 
+        "KFC", 
+        "coreset", 
+        "dummy"
+      )),
       timeout_s = if_else(time_s > 30*60, 30*60, timeout_s),
       timed_out = !is.na(timeout_s),
       time_s = if_else(timed_out, timeout_s, time_s),
@@ -80,6 +96,14 @@ load_data <- function(delta_val = 0.01) {
     ) |>
     group_by(dataset, k) |>
     mutate(scaled_radius = radius / min(radius, na.rm=T)) |>
+    ungroup() |>
+    group_by(dataset, algorithm, k, delta, tau, timed_out, coreset_size_frac, n, dimensions) |>
+    summarise(
+      across(c(radius, scaled_radius, coreset_radius, 
+                time_s, coreset_time_s,
+            ), mean),
+      additive_violation = max(additive_violation)
+    ) |>
     ungroup()
 
   if (!is.na(delta_val)) {
@@ -103,7 +127,7 @@ ojs_define(data = dataojs)
 ```
 
 
-```{r}
+```{r tab-dimensions}
 dataset_stats() |>
   distinct(dataset, n, dimensions) |>
   arrange(desc(n)) |>
@@ -259,21 +283,22 @@ Inputs.table(search)
 
 Here we look at the tradeoff between radius and how much time is required to achieve it
 
-```{r}
+```{r fig-time-vs-radius}
+#| fig-cap: Time vs radius
 load_data() |>
   filter(k == 32) |>
   arrange(dataset, k, algorithm, tau) |>
   ggplot(aes(scaled_radius, time_s, color=algorithm, shape=algorithm)) +
   geom_point() +
   scale_algorithm() +
-  facet_wrap(vars(dataset), scales="free") +
+  facet_wrap(vars(dataset), scales="free", ncol=5) +
   theme_paper()
 ggsave("figs/time-vs-radius-k32.png", dpi=300, width=8, height=8)
 ```
 
 Now we look at the effect of changing the size of the coreset on the radius, for a fixed value of $k$.
 
-```{r}
+```{r fig-tau-vs-solution-radius}
 load_data() |>
   filter(k == 32) |>
   mutate(coreset_size = tau * k) |>
@@ -286,20 +311,42 @@ load_data() |>
   ) +
   scale_x_continuous(trans="log2") +
   scale_algorithm() +
-  facet_wrap(vars(dataset), scales="free_y", ncol=3) +
+  facet_wrap(vars(dataset), scales="free_y", ncol=5) +
   labs(
     x = "coreset size",
     y = "radius (scaled by the unfair clustering radius)"
   ) +
   theme_paper()
-ggsave("figs/tau-radius-k32.png", dpi=300, width=8, height=8)
+ggsave("figs/tau-radius-k32.png", dpi=300, width=8, height=3)
+```
+
+```{r tau-vs-coreset-radius}
+load_data() |>
+  filter(k == 32) |>
+  mutate(coreset_size = tau * k) |>
+  ggplot(aes(x=coreset_size, y=coreset_radius, color=algorithm)) +
+  geom_point(data = ~filter(., !is.na(tau))) +
+  geom_line(data = ~filter(., !is.na(tau))) +
+  geom_hline(
+    aes(yintercept=radius, color=algorithm),
+    data = ~filter(., algorithm == "KFC")
+  ) +
+  scale_x_continuous(trans="log2") +
+  scale_algorithm() +
+  facet_wrap(vars(dataset), scales="free_y", ncol=5) +
+  labs(
+    x = "coreset size",
+    y = "radius"
+  ) +
+  theme_paper()
+ggsave("figs/tau-coreset-radius-k32.png", dpi=300, width=8, height=3)
 ```
 
 The following plot is the same, with the time being the dependent variable On
 `reuter_50_50` we see a slow performance because there are 50 colors, hence
 there are many replicas of the same coreset point.
 
-```{r}
+```{r tau-vs-time}
 load_data(delta_val=0.01) |>
   filter(k == 32) |>
   mutate(coreset_size = tau * k) |>
@@ -311,14 +358,33 @@ load_data(delta_val=0.01) |>
     data = ~filter(., is.na(tau))
   ) +
   scale_x_continuous(trans="log2") +
+  scale_y_continuous(trans="log10") +
   scale_algorithm() +
-  facet_wrap(vars(dataset), scales="free_y", ncol=3) +
+  facet_wrap(vars(dataset), scales="fixed", ncol=5) +
   labs(
     x = "coreset size",
     y = "time (seconds)"
   ) +
   theme_paper()
-ggsave("figs/tau-time-k32.png", dpi=300, width=8, height=8)
+ggsave("figs/tau-time-k32.png", dpi=300, width=8, height=4)
+```
+
+```{r radius-vs-k}
+load_data(delta_val=0.01) |>
+  filter(is.na(tau) | (tau == 32)) |>
+  ggplot(aes(x=k, y=radius, color=algorithm)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(trans="log2") +
+  scale_y_continuous(trans="identity") +
+  scale_algorithm() +
+  facet_wrap(vars(dataset), scales="free_y", ncol=5) +
+  labs(
+    x = "k",
+    y = "radius"
+  ) +
+  theme_paper()
+ggsave("figs/radius.png", dpi=300, width=8, height=4)
 ```
 
 How does the tolerance $\delta$ change the radius?
@@ -332,8 +398,126 @@ load_data(delta_val=NA) |>
   geom_point() +
   geom_line() +
   scale_algorithm() +
-  facet_wrap(vars(dataset), scales="free_y") +
+  facet_wrap(vars(dataset), scales="free_y", ncol=5) +
   theme_paper()
+```
+
+```{r}
+load_data() |>
+  filter(k == 32) |>
+  filter(( tau == 32 ) | is.na(tau)) |>
+  mutate(dataset = fct_reorder(dataset, n)) |>
+  select(dataset, algorithm, radius) |>
+  arrange(desc(dataset)) |>
+  group_by(dataset) |>
+  mutate(
+    c_length = max(
+      str_length(dataset),
+      str_length(scales::number(max(radius, na.rm=T), big.mark="", accuracy=0.01))
+    ),
+    radius = str_c(
+      "\\barplot[",
+      c_length,
+      "ex]{", radius, "}{",
+      max(radius, na.rm=T), "}"
+    )
+  ) |>
+  ungroup() |>
+  select(-c_length) |>
+  pivot_wider(names_from="dataset", values_from="radius") |>
+  arrange(algorithm) |>
+  kbl(format="latex", linesep="", booktabs=T, align=c("l", rep("r", 10)),
+      escape=FALSE,
+      caption="Radius for $k=32$ and $\\tau=32$",
+      label="radius-32") |>
+  kable_styling() |>
+  str_replace_all("table", "table*") |>
+  str_replace_all("NA", "-") |>
+  str_replace_all("_50_50", "") |>
+  write_file("figs/radius-k32-tau32.tex")
+```
+
+```{r tab-largest-ratio}
+load_data() |>
+  filter(k == 32) |>
+  filter(( tau == 32 ) | is.na(tau)) |>
+  select(dataset, algorithm, radius) |>
+  filter(algorithm %in% c("KFC", "coreset")) |>
+  pivot_wider(names_from="algorithm", values_from="radius") |>
+  mutate(ratio = coreset / KFC) |>
+  arrange(desc(ratio)) |>
+  kbl() |>
+  kable_styling()
+```
+
+```{r}
+load_data() |>
+  filter(k == 32) |>
+  filter(( tau == 32 ) | is.na(tau)) |>
+  mutate(dataset = fct_reorder(dataset, n)) |>
+  select(dataset, algorithm, time=time_s) |>
+  arrange(desc(dataset)) |>
+  group_by(dataset) |>
+  mutate(
+    c_length = max(
+      str_length(first(dataset)),
+      str_length(scales::number(max(time, na.rm=T), accuracy=0.01))
+    ),
+    time = str_c(
+      "\\barplot[",
+      c_length,
+      "ex]{", time, "}{",
+      max(time, na.rm=T), "}"
+    )
+  ) |>
+  ungroup() |>
+  select(-c_length) |>
+  pivot_wider(names_from="dataset", values_from="time") |>
+  arrange(algorithm) |>
+  kbl(format="latex", linesep="", booktabs=T, align=c("l", rep("r", 10)),
+      escape=FALSE,
+      caption="Running time in seconds, for $k=32$ and $\\tau=32$", 
+      label="time-32") |>
+  kable_styling() |>
+  str_replace_all("table", "table*") |>
+  str_replace_all("NA", "-") |>
+  str_replace_all("_50_50", "") |>
+  write_file("figs/time-k32-tau32.tex")
+```
+
+```{r}
+load_data() |>
+  filter(k == 32) |>
+  filter(( tau == 32 ) | is.na(tau)) |>
+  mutate(dataset = fct_reorder(dataset, n)) |>
+  select(dataset, algorithm, additive_violation) |>
+  arrange(desc(dataset)) |>
+  group_by(dataset) |>
+  mutate(
+    c_length = max(
+      str_length(first(dataset)),
+      str_length(scales::number(max(additive_violation, na.rm=T), accuracy=0.01))
+    ),
+    additive_violation = str_c(
+      "\\barplot[",
+      c_length,
+      "ex]{", additive_violation, "}{",
+      max(additive_violation, na.rm=T), "}"
+    )
+  ) |>
+  ungroup() |>
+  select(-c_length) |>
+  pivot_wider(names_from="dataset", values_from="additive_violation") |>
+  arrange(algorithm) |>
+  kbl(format="latex", linesep="", booktabs=T, align=c("l", rep("r", 10)),
+      escape=FALSE,
+      caption="Additive violation, for $k=32$ and $\\tau=32$", 
+      label="time-32") |>
+  kable_styling() |>
+  str_replace_all("table", "table*") |>
+  str_replace_all("NA", "-") |>
+  str_replace_all("_50_50", "") |>
+  write_file("figs/violation-k32-tau32.tex")
 ```
 
 

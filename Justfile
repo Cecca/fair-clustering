@@ -3,7 +3,7 @@ remote := "ceccarello@login.dei.unipd.it:/nfsd/lovelace/ceccarello/fair-clusteri
 syncdb:
   scp {{remote}}/results.db .
   touch experiments.qmd
-  scp {{remote}}/results.hdf5 .
+  # scp {{remote}}/results.hdf5 .
 
 update_images:
   python viz.py results.hdf5 imgs
