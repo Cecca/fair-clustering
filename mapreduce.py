@@ -67,7 +67,10 @@ class MRCoresetFairKCenter(object):
             return offset, MRData(coreset_points, point_ids, colors, proxy, coreset_weights)
 
         # Build the coreset
-        sc = pyspark.SparkContext(self.master)
+        conf = pyspark.SparkConf()
+        conf.set("spark.driver.memory", "16G")
+        conf.set("spark.executor.memory", "16G")
+        sc = pyspark.SparkContext(self.master, conf=conf)
         p = sc.defaultParallelism
         self.parallelism = p
         splitdata = np.array_split(X, p, axis=0)

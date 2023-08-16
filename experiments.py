@@ -133,7 +133,7 @@ if __name__ == "__main__":
     else:
         cplex_path = None
 
-    exhaustive()
-    delta_influence()
+    #exhaustive()
+    #delta_influence()
     mr_experiments()
 

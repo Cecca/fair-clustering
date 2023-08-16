@@ -7,7 +7,7 @@ From: ubuntu:jammy-20230308
 %post
   # Install minimal dependencies
   apt-get update
-  apt-get install -y curl bzip2
+  apt-get install -y curl bzip2 default-jre
 
   # Create environment for micromamba
   mkdir -p /opt/env/micromamba
