@@ -1,4 +1,5 @@
 import sys
+import mapreduce
 import kcenter
 import results
 import datasets
@@ -98,6 +99,29 @@ def exhaustive():
             evaluate(dataset, delta, algo, k, ofile)
 
 
+def mr_experiments():
+    ofile = "results.hdf5"
+    ks = [32]
+    deltas = [0.01]
+    all_datasets = ["census1990", "hmda", "athlete"]
+    for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
+        n, dim = datasets.dataset_size(dataset)
+        for threads in [2, 4, 8, 16, 32]:
+            master = f"local[{threads}]"
+            algos = [
+                mapreduce.BeraEtAlMRFairKCenter(
+                    k, master, cplex_path, seed=seed)
+                for seed in [1]
+            ] + [
+                mapreduce.MRCoresetFairKCenter(
+                    k, tau, master, cplex_path, seed=seed)
+                for tau in [2*k, 8*k, 32*k, 64*k, 128*k]
+                for seed in [1]
+                if tau <= n
+            ]
+            for algo in algos:
+                evaluate(dataset, delta, algo, k, ofile)
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
@@ -111,4 +135,5 @@ if __name__ == "__main__":
 
     exhaustive()
     delta_influence()
+    mr_experiments()
 

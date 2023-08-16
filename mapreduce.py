@@ -128,8 +128,8 @@ class MRCoresetFairKCenter(object):
         
 
 class BeraEtAlMRFairKCenter(MRCoresetFairKCenter):
-    def __init__(self, k, master, cplex_path=None, subroutine_name="freq_distributor", seed=42):
-        super().__init__(k, k, master, cplex_path, subroutine_name, seed)
+    def __init__(self, k, master, cplex_path=None, seed=42):
+        super().__init__(k, k, master, cplex_path, subroutine_name="bera-et-al", seed=seed)
 
     def name(self):
         return "bera-mr-fair-k-center"
@@ -151,10 +151,10 @@ if __name__ == "__main__":
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
 
-    tau = int(k*200)
+    tau = int(k*20)
     logging.info("Tau is %d", tau)
     algo = MRCoresetFairKCenter(k, tau, master, cplex_path)
-    # algo = BeraEtAlMRFairKCenter(k, master, cplex_path)
+    algo = BeraEtAlMRFairKCenter(k, master, cplex_path)
 
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
