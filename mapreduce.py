@@ -28,7 +28,8 @@ class MRCoresetFairKCenter(object):
         return {
             "tau": self.tau,
             "seed": self.seed,
-            "subroutine": self.subroutine_name
+            "subroutine": self.subroutine_name,
+            "parallelism": self.parallelism
         }
 
     def additional_metrics(self):
@@ -64,15 +65,10 @@ class MRCoresetFairKCenter(object):
 
             return offset, MRData(coreset_points, point_ids, colors, proxy, coreset_weights)
 
-        def parallel_assign(args):
-            offset, (mrdata, assignmnent) = args
-            print("offset", offset)
-            print("mrdata", mrdata)
-
         # Build the coreset
         sc = pyspark.SparkContext(self.master)
         p = sc.defaultParallelism
-        print("parallelism", p)
+        self.parallelism = p
         splitdata = np.array_split(X, p, axis=0)
         splitcolor = np.array_split(colors, p, axis=0)
         X = []
@@ -126,8 +122,17 @@ class MRCoresetFairKCenter(object):
         end = time.time()
         self.elapsed = end - start
 
+        sc.stop()
+
         return assignment
         
+
+class BeraEtAlMRFairKCenter(MRCoresetFairKCenter):
+    def __init__(self, k, master, cplex_path=None, subroutine_name="freq_distributor", seed=42):
+        super().__init__(k, k, master, cplex_path, subroutine_name, seed)
+
+    def name(self):
+        return "bera-mr-fair-k-center"
 
 
 if __name__ == "__main__":
@@ -146,9 +151,10 @@ if __name__ == "__main__":
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
 
-    tau = int(k*2)
+    tau = int(k*200)
     logging.info("Tau is %d", tau)
     algo = MRCoresetFairKCenter(k, tau, master, cplex_path)
+    # algo = BeraEtAlMRFairKCenter(k, master, cplex_path)
 
     assignment = algo.fit_predict(data, colors, fairness_constraints)
     centers = algo.centers
