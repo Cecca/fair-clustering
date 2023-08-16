@@ -169,7 +169,7 @@ class BeraEtAlKCenter(object):
         start = time.time()
 
         # Step 1. Find centers
-        centers = greedy_minimum_maximum(X, self.k, seed=self.seed)
+        centers, _assignment = greedy_minimum_maximum(X, self.k, seed=self.seed)
         costs = pairwise_distances(X, X[centers])
 
         # Step 2. Find assignment

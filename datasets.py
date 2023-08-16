@@ -366,13 +366,13 @@ DATASETS = {
     "adult": adult,
     "athlete": athlete,
     "diabetes": diabetes,
-    # "census1990": census1990,
+    "census1990": census1990,
     "creditcard": creditcard,
     "4area": four_area,
     "reuter_50_50": c50,
     "victorian": victorian,
     "bank": bank,
-    # "hmda": hmda,
+    "hmda": hmda,
     "random_dbg": random_dbg
 }
 

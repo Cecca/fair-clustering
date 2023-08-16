@@ -7,7 +7,7 @@ import logging
 import signal
 from baseline.adapter import KFC
 
-TIMEOUT_SECS = 30*60
+TIMEOUT_SECS = 12*60*60 # 12 hours
 
 
 class TimeoutException(Exception):
@@ -76,21 +76,22 @@ def delta_influence():
 
 def exhaustive():
     ofile = "results.hdf5"
-    ks = [2, 4, 8, 16, 32]
+    ks = [32]
+    # ks = [2, 4, 8, 16, 32]
     deltas = [0.01]
     all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
         algos = [
             # kcenter.Dummy(k),
-            kcenter.UnfairKCenter(k),
+            # kcenter.UnfairKCenter(k),
             # kcenter.BeraEtAlKCenter(k, cplex_path),
-            KFC(k, cplex_path)
+            # KFC(k, cplex_path)
         ] + [
             kcenter.CoresetFairKCenter(
                 k, tau, cplex_path, seed=seed)
             for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k]
-            for seed in [1]
+            for seed in [1,2,3,4,5,6,7]
             if tau <= n
         ]
         for algo in algos:
