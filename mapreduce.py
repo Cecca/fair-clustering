@@ -1,23 +1,64 @@
+import multiprocessing
 from assignment import weighted_fair_assignment, fair_assignment, freq_distributor
 import time
 from kcenter import greedy_minimum_maximum, assign_original_points
 from sklearn.metrics import pairwise_distances
-import pyspark
 import logging
 import pulp
 import numpy as np
+from collections import namedtuple
+
+
+MRData = namedtuple("MRData", ["coreset_points",
+                    "point_ids", "colors", "proxy", "coreset_weights"])
+
+
+class Reducer(object):
+    def __init__(self, tau, ncolors, seed):
+        self.tau = tau
+        self.ncolors = ncolors
+        self.seed = seed
+
+    def __call__(self, arg):
+        import cProfile
+        import pstats
+
+        offset, (pts, colors) = arg
+        greedy_minimum_maximum(pts[:10,:], 2, self.seed) # precompile on the current process
+
+        pr = cProfile.Profile()
+        pr.enable()
+        point_ids, proxy = greedy_minimum_maximum(pts, self.tau, self.seed)
+        coreset_points = pts[point_ids]
+
+        point_ids += offset
+        coreset_weights = np.zeros(
+            (point_ids.shape[0], self.ncolors), dtype=np.int64)
+
+        for color, proxy_idx in zip(colors, proxy):
+            coreset_weights[proxy_idx, color] += 1
+
+        ret = MRData(coreset_points, point_ids, colors, proxy, coreset_weights)
+
+        pr.disable()
+        id = multiprocessing.current_process()
+        with open(f"profile-{id}.txt", "w") as fp:
+            sortby = pstats.SortKey.CUMULATIVE
+            ps = pstats.Stats(pr, stream=fp).sort_stats(sortby)
+            ps.print_stats()
+
+        return offset, ret
 
 
 class MRCoresetFairKCenter(object):
-    def __init__(self, k, tau, master, cplex_path=None, subroutine_name="freq_distributor", seed=42):
+    def __init__(self, k, tau, parallelism, cplex_path=None, subroutine_name="freq_distributor", seed=42):
         self.k = k
         self.tau = tau
         self.seed = seed
-        self.master = master
         self.subroutine_name = subroutine_name
         self.solver_cmd = pulp.CPLEX_CMD(
             path=cplex_path, msg=False) if cplex_path is not None else pulp.COIN_CMD(msg=False)
-        self.parallelism = int(master.replace("local[", "").replace("]", ""))
+        self.parallelism = parallelism
 
     def name(self):
         return "mr-coreset-fair-k-center"
@@ -42,39 +83,15 @@ class MRCoresetFairKCenter(object):
         }
 
     def fit_predict(self, X, colors, fairness_constraints):
-        from collections import namedtuple
-        start = time.time()
-
         tau = self.tau
         seed = self.seed
         ncolors = np.max(colors) + 1
 
-        MRData = namedtuple("MRData", ["coreset_points",
-                            "point_ids", "colors", "proxy", "coreset_weights"])
-
-        def inner(arg):
-            offset, (pts, colors) = arg
-            point_ids, proxy = greedy_minimum_maximum(pts, tau, seed)
-            coreset_points = pts[point_ids]
-
-            point_ids += offset
-            coreset_weights = np.zeros(
-                (point_ids.shape[0], ncolors), dtype=np.int64)
-
-            for color, proxy_idx in zip(colors, proxy):
-                coreset_weights[proxy_idx, color] += 1
-
-            return offset, MRData(coreset_points, point_ids, colors, proxy, coreset_weights)
-
         # Build the coreset
-        conf = pyspark.SparkConf()
-        conf.set("spark.driver.memory", "16G")
-        conf.set("spark.executor.memory", "16G")
-        sc = pyspark.SparkContext(self.master, conf=conf)
-        p = sc.defaultParallelism
-        self.parallelism = p
-        splitdata = np.array_split(X, p, axis=0)
-        splitcolor = np.array_split(colors, p, axis=0)
+        pool = multiprocessing.Pool(self.parallelism)
+
+        splitdata = np.array_split(X, self.parallelism, axis=0)
+        splitcolor = np.array_split(colors, self.parallelism, axis=0)
         X = []
         off = 0
         for dat, col in zip(splitdata, splitcolor):
@@ -82,9 +99,10 @@ class MRCoresetFairKCenter(object):
             X.append((off, (dat, col)))
             off += dat.shape[0]
 
-        Xp = sc.parallelize(X, p).repartition(p)
-        coreset_p = Xp.map(inner).cache()
-        coreset = coreset_p.collect()
+        start = time.time()
+        coreset = pool.map(Reducer(tau, ncolors, seed), X, 1)
+        # coreset = map(Reducer(tau, ncolors, seed), X)
+        self.time_coreset_s = time.time() - start
 
         coreset_ids = []
         coreset_points = []
@@ -103,7 +121,6 @@ class MRCoresetFairKCenter(object):
         coreset_proxy = np.hstack(coreset_proxy)
         coreset_points = np.vstack(coreset_points)
         coreset_weights = np.vstack(coreset_weights)
-        self.time_coreset_s = time.time() - start
         self.coreset_size = np.flatnonzero(coreset_weights).shape[0]
 
         # Step 2. Find the greedy centers in the coreset
@@ -126,46 +143,44 @@ class MRCoresetFairKCenter(object):
         end = time.time()
         self.elapsed = end - start
 
-        sc.stop()
-
         return assignment
         
 
 class BeraEtAlMRFairKCenter(MRCoresetFairKCenter):
-    def __init__(self, k, master, cplex_path=None, seed=42):
-        super().__init__(k, k, master, cplex_path, subroutine_name="bera-et-al", seed=seed)
+    def __init__(self, k, parallelism, cplex_path=None, seed=42):
+        super().__init__(k, k, parallelism, cplex_path, subroutine_name="bera-et-al", seed=seed)
 
     def name(self):
         return "bera-mr-fair-k-center"
 
 
 if __name__ == "__main__":
+    import pandas as pd
     import assess
     import datasets
     import kcenter
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.WARNING)
 
     cplex_path = "/home/matteo/opt/cplex/cplex/bin/x86-64_linux/cplex"
 
-    master = "local[4]"
     k = 32
     delta = 0.01
-    dataset = "4area"
+    dataset = "athlete"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
 
-    tau = int(k*20)
+    tau = int(k*32)
     logging.info("Tau is %d", tau)
-    # algo = MRCoresetFairKCenter(k, tau, master, cplex_path)
-    algo = BeraEtAlMRFairKCenter(k, master, cplex_path)
+    df = []
+    for parallelism in [8]:
+        algo = MRCoresetFairKCenter(k, tau, parallelism, cplex_path)
 
-    assignment = algo.fit_predict(data, colors, fairness_constraints)
-    centers = algo.centers
-    print("radius", assess.radius(data, centers, assignment))
-    print("cluster sizes", assess.cluster_sizes(centers, assignment))
-    print("violation", assess.additive_violations(
-        k, colors, assignment, fairness_constraints))
-    print(algo.attrs())
-    print(algo.additional_metrics())
-    print("time", algo.time())
+        assignment = algo.fit_predict(data, colors, fairness_constraints)
+        df.append({
+            "parallelism": parallelism,
+            "time": algo.time(),
+            "coreset_time": algo.additional_metrics()["time_coreset_s"]
+        })
+    df = pd.DataFrame(df)
+    print(df)

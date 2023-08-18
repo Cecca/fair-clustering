@@ -34,9 +34,11 @@ theme_paper <- function() {
 scale_algorithm <- function() {
   scale_color_manual(values = c(
     "coreset" = "#5778a4",
+    "coreset-MR" = "#5778a4",
     "KFC" = "#e49444",
     "unfair" = "#d1615d",
     "Bera-et-al" = "#85b6b2",
+    "Bera-et-al-MR" = "#85b6b2",
     "dummy" = "black"
   ))
 }
@@ -54,14 +56,25 @@ dataset_stats <- function() {
   stats
 }
 
-load_data <- function(delta_val = 0.01) {
+load_data <- function(delta_val = 0.01, mr = FALSE) {
   con <- DBI::dbConnect(RSQLite::SQLite(), "results.db")
 
-  q <- "select *, json_extract(params, '$.tau') / k as tau,
-        cast(additional_metrics -> '$.coreset_radius' as real) as coreset_radius,
-        cast(additional_metrics -> '$.time_coreset_s' as real) as coreset_time_s
-        from results
-        where dataset not like '%std'"
+  if (mr) {
+    algofilter <- "algorithm like '%mr%'"
+    parallel_col <- "json_extract(params, '$.parallelism') as parallelism,"
+  } else {
+    algofilter <- "algorithm not like '%mr%'"
+    parallel_col <- "1 as parallelism,"
+  }
+
+  q <- str_glue(
+      "select *, json_extract(params, '$.tau') / k as tau,
+       {parallel_col}
+       cast(additional_metrics -> '$.coreset_radius' as real) as coreset_radius,
+       cast(additional_metrics -> '$.time_coreset_s' as real) as coreset_time_s
+       from results
+       where dataset not like '%std'
+       and {algofilter}")
 
   results <- tbl(con, sql(q)) |> 
     inner_join(tbl(con, "dataset_stats")) |>
@@ -76,13 +89,17 @@ load_data <- function(delta_val = 0.01) {
         algorithm == "kfc-k-center" ~ "KFC",
         algorithm == "unfair-k-center" ~ "unfair",
         algorithm == "bera-et-al-k-center" ~ "Bera-et-al",
+        algorithm == "bera-mr-fair-k-center" ~ "Bera-et-al-MR",
+        algorithm == "mr-coreset-fair-k-center" ~ "coreset-MR",
         T ~ algorithm
       ),
       algorithm = factor(algorithm, ordered=TRUE, levels=c(
         "unfair", 
         "Bera-et-al", 
+        "Bera-et-al-MR", 
         "KFC", 
-        "coreset", 
+        "coreset",
+        "coreset-MR", 
         "dummy"
       )),
       timeout_s = if_else(time_s > 30*60, 30*60, timeout_s),
@@ -97,7 +114,7 @@ load_data <- function(delta_val = 0.01) {
     group_by(dataset, k) |>
     mutate(scaled_radius = radius / min(radius, na.rm=T)) |>
     ungroup() |>
-    group_by(dataset, algorithm, k, delta, tau, timed_out, coreset_size_frac, n, dimensions) |>
+    group_by(dataset, algorithm, k, delta, tau, parallelism, timed_out, coreset_size_frac, n, dimensions) |>
     summarise(
       across(c(radius, scaled_radius, coreset_radius, 
                 time_s, coreset_time_s,
@@ -116,6 +133,9 @@ load_data <- function(delta_val = 0.01) {
 }
 
 results <- load_data()
+```
+
+```{r}
 dataojs <- results |>
   select(dataset, k, algorithm, tau, radius, time_s, scaled_radius, additive_violation) |>
   group_by(dataset, k, algorithm, tau) |>
@@ -520,6 +540,15 @@ load_data() |>
   write_file("figs/violation-k32-tau32.tex")
 ```
 
+```{r}
+load_data(mr=TRUE) |>
+  filter(k == 32) |>
+  ggplot(aes(parallelism, coreset_time_s, color=algorithm, shape=factor(tau))) +
+  geom_line() +
+  facet_wrap(vars(dataset)) +
+  scale_algorithm() +
+  theme_paper()
+```
 
 
 
