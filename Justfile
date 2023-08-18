@@ -9,4 +9,4 @@ update_images:
   python viz.py results.hdf5 imgs
 
 preview:
-  quarto preview experiments.qmd
+  ./analysis.sif experiments.qmd

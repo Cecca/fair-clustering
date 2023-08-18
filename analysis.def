@@ -1,0 +1,18 @@
+Bootstrap: docker
+From: mambaorg/micromamba:1.4.9-bullseye-slim
+
+%files
+  env-analysis.yaml /env.yaml
+
+%post
+  eval "$(micromamba shell hook --shell posix)"
+  micromamba activate
+  micromamba install -y -q -n base -f /env.yaml
+  micromamba clean --all
+
+%environment
+  eval "$(micromamba shell hook --shell posix)"
+  micromamba activate
+
+%runscript
+  quarto preview $@
