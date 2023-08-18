@@ -1,0 +1,15 @@
+[package]
+name = "fairkcenter"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "fairkcenter"
+crate-type = ["cdylib"]
+
+[dependencies]
+ndarray = { version = "0.15.6", features = ["rayon"] }
+numpy = "0.19.0"
+pyo3 = "0.19.0"
+

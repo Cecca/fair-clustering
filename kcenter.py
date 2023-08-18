@@ -4,6 +4,7 @@ from sklearn.metrics import pairwise_distances
 import logging
 import time
 import pulp
+from fairkcenter import greedy_minimum_maximum, build_coreset
 
 import datasets
 from assignment import weighted_fair_assignment, fair_assignment, freq_distributor
@@ -229,7 +230,7 @@ class Timer():
         self.time = time.time()
 
 # @njit()
-def greedy_minimum_maximum(data, k, seed=123):
+def _greedy_minimum_maximum(data, k, seed=123):
     timer = Timer()
     np.random.seed(seed)
     sq_norms = np.zeros(data.shape[0])
@@ -343,14 +344,19 @@ class CoresetFairKCenter(object):
         # Step 1. Build the coreset
         self.data = X
         start = time.time()
-        coreset_ids, coreset, proxy, weights = self.build_coreset(
-            X, self.tau, colors)
+        coreset_ids, coreset, proxy, weights = build_coreset(
+            X, tau, colors)
+        self.coreset_points_ids = coreset_ids
+        self.proxy = proxy
+
         self.time_coreset_s = time.time() - start
         self.coreset_size = np.flatnonzero(weights).shape[0]
         print(f"coreset size {self.coreset_size}")
 
         # Step 2. Find the greedy centers in the coreset
+        gmm_start = time.time()
         centers, assignment = greedy_minimum_maximum(coreset, self.k)
+        print("GMM took" , time.time() - gmm_start)
         costs = pairwise_distances(coreset, coreset[centers])
 
         # Step 3. Find a fair assignment with the centers in the coreset
@@ -424,11 +430,12 @@ if __name__ == "__main__":
     dataset = "4area"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
+    print("dtype", data.dtype)
     n, dims = datasets.dataset_size(dataset)
     # viz.plot_dataset(dataset, "dataset.png")
 
     # Fair
-    tau = int(k*2)
+    tau = int(k*32)
     logging.info("Tau is %d", tau)
     algo = Dummy(k)
     algo = CoresetFairKCenter(

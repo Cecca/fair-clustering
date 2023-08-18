@@ -1,3 +1,4 @@
+from fairkcenter import parallel_build_coreset
 import multiprocessing
 from assignment import weighted_fair_assignment, fair_assignment, freq_distributor
 import time
@@ -84,43 +85,16 @@ class MRCoresetFairKCenter(object):
 
     def fit_predict(self, X, colors, fairness_constraints):
         tau = self.tau
-        seed = self.seed
-        ncolors = np.max(colors) + 1
 
         # Build the coreset
-        pool = multiprocessing.Pool(self.parallelism)
-
-        splitdata = np.array_split(X, self.parallelism, axis=0)
-        splitcolor = np.array_split(colors, self.parallelism, axis=0)
-        X = []
-        off = 0
-        for dat, col in zip(splitdata, splitcolor):
-            assert dat.shape[0] == col.shape[0]
-            X.append((off, (dat, col)))
-            off += dat.shape[0]
-
         start = time.time()
-        coreset = pool.map(Reducer(tau, ncolors, seed), X, 1)
-        # coreset = map(Reducer(tau, ncolors, seed), X)
+        coreset_ids, coreset_points, coreset_proxy, coreset_weights = parallel_build_coreset(
+            self.parallelism, X, tau, colors)
         self.time_coreset_s = time.time() - start
+        print("Coreset built in", self.time_coreset_s, "seconds")
+        print(coreset_ids)
+        print("max coreset proxy",max(coreset_proxy))
 
-        coreset_ids = []
-        coreset_points = []
-        coreset_weights = []
-        coreset_proxy = []
-        breaks = []
-        offsets = []
-        for offset, mrdata in sorted(coreset): # Sort by offset
-            offsets.append(offset)
-            coreset_ids.append(mrdata.point_ids)
-            coreset_points.append(mrdata.coreset_points)
-            coreset_weights.append(mrdata.coreset_weights)
-            coreset_proxy.extend(mrdata.proxy + np.sum(breaks))
-            breaks.append(mrdata.coreset_points.shape[0])
-        coreset_ids = np.hstack(coreset_ids)
-        coreset_proxy = np.hstack(coreset_proxy)
-        coreset_points = np.vstack(coreset_points)
-        coreset_weights = np.vstack(coreset_weights)
         self.coreset_size = np.flatnonzero(coreset_weights).shape[0]
 
         # Step 2. Find the greedy centers in the coreset
@@ -173,7 +147,7 @@ if __name__ == "__main__":
     tau = int(k*32)
     logging.info("Tau is %d", tau)
     df = []
-    for parallelism in [8]:
+    for parallelism in [2, 4, 8]:
         algo = MRCoresetFairKCenter(k, tau, parallelism, cplex_path)
 
         assignment = algo.fit_predict(data, colors, fairness_constraints)
