@@ -29,6 +29,13 @@ fn argmax(v: &Array1<f64>) -> usize {
 
 fn greedy_minimum_maximum(data: &ArrayView2<f64>, k: usize) -> (Array1<usize>, Array1<usize>) {
     let n = data.shape()[0];
+    if n <= k {
+        // Each point is its own center
+        let centers = Array1::<usize>::from_iter(0..n);
+        let assignment = Array1::<usize>::from_iter(0..n);
+        return (centers, assignment);
+    }
+
     let sq_norms = compute_sq_norms(&data);
 
     let first_center = 0usize;
@@ -83,18 +90,18 @@ impl Coreset {
         data: &ArrayView2<f64>,
         tau: usize,
         colors: &ArrayView1<i64>,
+        ncolors: usize,
         offset: Option<usize>,
     ) -> Self {
-        let start = Instant::now();
         let offset = offset.unwrap_or(0);
+        let start = Instant::now();
         let (point_ids, proxy) = greedy_minimum_maximum(data, tau);
-        let ncolors = colors.iter().max().unwrap() + 1;
-        let mut points = Array2::<f64>::zeros((tau, data.ncols()));
+        let mut points = Array2::<f64>::zeros((point_ids.len(), data.ncols()));
         for (idx, point_id) in point_ids.iter().enumerate() {
             points.slice_mut(s![idx, ..]).assign(&data.row(*point_id));
         }
         let point_ids = point_ids + offset; // offset the IDs
-        let mut weights = Array2::<u64>::zeros((tau, ncolors as usize));
+        let mut weights = Array2::<u64>::zeros((point_ids.len(), ncolors as usize));
         println!(
             "Colors shape {:?}, proxy shape {:?}",
             colors.shape(),
@@ -122,9 +129,12 @@ impl Coreset {
             self.point_ids.len(),
             other.point_ids.len()
         );
-        let point_ids =
-            concatenate(Axis(0), &[self.point_ids.view(), other.point_ids.view()]).unwrap();
-        let points = concatenate(Axis(0), &[self.points.view(), other.points.view()]).unwrap();
+        let point_ids = concatenate(Axis(0), &[self.point_ids.view(), other.point_ids.view()])
+            .expect("error composing point_ids");
+        let points = concatenate(Axis(0), &[self.points.view(), other.points.view()])
+            .expect("error composing points");
+        assert_eq!(points.ncols(), self.points.ncols());
+        assert_eq!(points.ncols(), other.points.ncols());
         let proxy = concatenate(
             Axis(0),
             &[
@@ -132,8 +142,10 @@ impl Coreset {
                 other.proxy.mapv(|p| p + self.point_ids.len()).view(),
             ],
         )
-        .unwrap();
-        let weights = concatenate(Axis(0), &[self.weights.view(), other.weights.view()]).unwrap();
+        .expect("error composing proxies");
+        assert_eq!(self.weights.ncols(), other.weights.ncols());
+        let weights = concatenate(Axis(0), &[self.weights.view(), other.weights.view()])
+            .expect("error composing weights");
 
         Self {
             point_ids,
@@ -148,8 +160,9 @@ impl Coreset {
         data: &ArrayView2<f64>,
         tau: usize,
         colors: &ArrayView1<i64>,
+        ncolors: usize,
     ) -> Self {
-        let chunk_size = (data.nrows() + 1) / processors;
+        let chunk_size = ((data.nrows() as f64) / (processors as f64)).ceil() as usize;
         data.axis_chunks_iter(Axis(0), chunk_size)
             .into_par_iter()
             .zip(colors.axis_chunks_iter(Axis(0), chunk_size))
@@ -162,7 +175,7 @@ impl Coreset {
                     chunk_colors.shape(),
                     off
                 );
-                Coreset::new(&chunk.view(), tau, &chunk_colors.view(), Some(off))
+                Coreset::new(&chunk.view(), tau, &chunk_colors.view(), ncolors, Some(off))
             })
             .reduce_with(|c1, c2| c1.compose(&c2))
             .unwrap()
@@ -188,6 +201,8 @@ impl Coreset {
 
 #[pymodule]
 fn fairkcenter(_py: Python, m: &PyModule) -> PyResult<()> {
+    debug_assert!(false, "We should only run in release mode!");
+
     #[pyfn(m)]
     #[pyo3(name = "greedy_minimum_maximum", signature=(data, k, seed=1234))]
     fn gmm_py<'py>(
@@ -214,7 +229,9 @@ fn fairkcenter(_py: Python, m: &PyModule) -> PyResult<()> {
         &'py PyArray1<usize>,
         &'py PyArray2<u64>,
     )> {
-        let coreset = Coreset::new(&data.as_array(), tau, &colors.as_array(), None);
+        let colors = colors.as_array();
+        let ncolors: usize = *colors.iter().max().unwrap() as usize + 1;
+        let coreset = Coreset::new(&data.as_array(), tau, &colors, ncolors, None);
         coreset.into_pytuple(py)
     }
 
@@ -232,7 +249,9 @@ fn fairkcenter(_py: Python, m: &PyModule) -> PyResult<()> {
         &'py PyArray2<u64>,
     )> {
         eprintln!("data shape {:?}", data.shape());
-        let coreset = Coreset::new_parallel(processors, &data.as_array(), tau, &colors.as_array());
+        let colors = colors.as_array();
+        let ncolors: usize = *colors.iter().max().unwrap() as usize + 1;
+        let coreset = Coreset::new_parallel(processors, &data.as_array(), tau, &colors, ncolors);
         coreset.into_pytuple(py)
     }
 

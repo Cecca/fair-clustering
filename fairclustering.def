@@ -12,7 +12,7 @@ From: ubuntu:jammy-20230308
 %post
   # Install minimal dependencies
   apt-get update
-  apt-get install -y curl bzip2 default-jre
+  apt-get install -y curl bzip2
 
   # Create environment for micromamba
   mkdir -p /opt/env/micromamba
@@ -37,6 +37,7 @@ From: ubuntu:jammy-20230308
   # Environment available at runtime, enriched by the 
   # scripts that set up micromamba
   export MAMBA_ROOT_PREFIX=/opt/env/micromamba
+  export RUST_BACKTRACE=1
   eval "$(micromamba shell hook -s posix)"
   micromamba activate
 

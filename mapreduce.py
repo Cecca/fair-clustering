@@ -147,7 +147,7 @@ if __name__ == "__main__":
     tau = int(k*32)
     logging.info("Tau is %d", tau)
     df = []
-    for parallelism in [1, 2, 4, 8, 16]:
+    for parallelism in [2,4,8,16,32]:
         algo = MRCoresetFairKCenter(k, tau, parallelism, cplex_path)
 
         assignment = algo.fit_predict(data, colors, fairness_constraints)
