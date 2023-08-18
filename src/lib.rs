@@ -199,6 +199,46 @@ impl Coreset {
     }
 }
 
+fn build_assignment(
+    colors: &ArrayView1<i64>,
+    proxy: &ArrayView1<usize>,
+    coreset_ids: &ArrayView1<usize>,
+    coreset_centers: &ArrayView1<usize>,
+    coreset_assignment: &mut ArrayViewMut3<i64>,
+) -> (Array1<usize>, Array1<usize>) {
+    let shp = coreset_assignment.shape();
+    let n = colors.len();
+    let nproxies = shp[0];
+    let k = shp[1];
+
+    let centers = coreset_centers.mapv(|c| coreset_ids[c]);
+    let mut assignment = Array1::<usize>::ones(n) * 9999999;
+
+    for c in 0..k {
+        for p in 0..nproxies {
+            let mut weight_to_distribute = coreset_assignment.slice_mut(s![p, c, ..]);
+            if weight_to_distribute.iter().any(|w| *w > 0) {
+                for x in 0..n {
+                    if proxy[x] == p {
+                        let color = colors[x] as usize;
+                        if weight_to_distribute[color] > 0 && assignment[x] > k {
+                            assignment[x] = c;
+                            weight_to_distribute[color] -= 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(
+        *assignment.iter().max().unwrap() < k,
+        "There are some unassigned points"
+    );
+
+    (centers, assignment)
+}
+
 #[pymodule]
 fn fairkcenter(_py: Python, m: &PyModule) -> PyResult<()> {
     debug_assert!(false, "We should only run in release mode!");
@@ -253,6 +293,29 @@ fn fairkcenter(_py: Python, m: &PyModule) -> PyResult<()> {
         let ncolors: usize = *colors.iter().max().unwrap() as usize + 1;
         let coreset = Coreset::new_parallel(processors, &data.as_array(), tau, &colors, ncolors);
         coreset.into_pytuple(py)
+    }
+
+    #[pyfn(m)]
+    #[pyo3(name = "build_assignment")]
+    fn build_assignment_py<'py>(
+        py: Python<'py>,
+        colors: PyReadonlyArray1<i64>,
+        proxy: PyReadonlyArray1<usize>,
+        coreset_ids: PyReadonlyArray1<usize>,
+        coreset_centers: PyReadonlyArray1<usize>,
+        mut coreset_assignment: PyReadwriteArray3<i64>,
+    ) -> PyResult<(&'py PyArray1<usize>, &'py PyArray1<usize>)> {
+        let mut coreset_assignment = coreset_assignment.as_array_mut();
+        let start = Instant::now();
+        let (centers, assignment) = build_assignment(
+            &colors.as_array(),
+            &proxy.as_array(),
+            &coreset_ids.as_array(),
+            &coreset_centers.as_array(),
+            &mut coreset_assignment,
+        );
+        eprintln!("Assignment of original points {:?}", Instant::now() - start);
+        Ok((centers.into_pyarray(py), assignment.into_pyarray(py)))
     }
 
     Ok(())

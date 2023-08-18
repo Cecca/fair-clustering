@@ -1,8 +1,6 @@
-from fairkcenter import parallel_build_coreset
-import multiprocessing
+from fairkcenter import parallel_build_coreset, build_assignment, greedy_minimum_maximum
 from assignment import weighted_fair_assignment, fair_assignment, freq_distributor
 import time
-from kcenter import greedy_minimum_maximum, assign_original_points
 from sklearn.metrics import pairwise_distances
 import logging
 import pulp
@@ -14,42 +12,42 @@ MRData = namedtuple("MRData", ["coreset_points",
                     "point_ids", "colors", "proxy", "coreset_weights"])
 
 
-class Reducer(object):
-    def __init__(self, tau, ncolors, seed):
-        self.tau = tau
-        self.ncolors = ncolors
-        self.seed = seed
-
-    def __call__(self, arg):
-        import cProfile
-        import pstats
-
-        offset, (pts, colors) = arg
-        greedy_minimum_maximum(pts[:10,:], 2, self.seed) # precompile on the current process
-
-        pr = cProfile.Profile()
-        pr.enable()
-        point_ids, proxy = greedy_minimum_maximum(pts, self.tau, self.seed)
-        coreset_points = pts[point_ids]
-
-        point_ids += offset
-        coreset_weights = np.zeros(
-            (point_ids.shape[0], self.ncolors), dtype=np.int64)
-
-        for color, proxy_idx in zip(colors, proxy):
-            coreset_weights[proxy_idx, color] += 1
-
-        ret = MRData(coreset_points, point_ids, colors, proxy, coreset_weights)
-
-        pr.disable()
-        id = multiprocessing.current_process()
-        with open(f"profile-{id}.txt", "w") as fp:
-            sortby = pstats.SortKey.CUMULATIVE
-            ps = pstats.Stats(pr, stream=fp).sort_stats(sortby)
-            ps.print_stats()
-
-        return offset, ret
-
+# class Reducer(object):
+#     def __init__(self, tau, ncolors, seed):
+#         self.tau = tau
+#         self.ncolors = ncolors
+#         self.seed = seed
+#
+#     def __call__(self, arg):
+#         import cProfile
+#         import pstats
+#
+#         offset, (pts, colors) = arg
+#         greedy_minimum_maximum(pts[:10,:], 2, self.seed) # precompile on the current process
+#
+#         pr = cProfile.Profile()
+#         pr.enable()
+#         point_ids, proxy = greedy_minimum_maximum(pts, self.tau, self.seed)
+#         coreset_points = pts[point_ids]
+#
+#         point_ids += offset
+#         coreset_weights = np.zeros(
+#             (point_ids.shape[0], self.ncolors), dtype=np.int64)
+#
+#         for color, proxy_idx in zip(colors, proxy):
+#             coreset_weights[proxy_idx, color] += 1
+#
+#         ret = MRData(coreset_points, point_ids, colors, proxy, coreset_weights)
+#
+#         pr.disable()
+#         id = multiprocessing.current_process()
+#         with open(f"profile-{id}.txt", "w") as fp:
+#             sortby = pstats.SortKey.CUMULATIVE
+#             ps = pstats.Stats(pr, stream=fp).sort_stats(sortby)
+#             ps.print_stats()
+#
+#         return offset, ret
+#
 
 class MRCoresetFairKCenter(object):
     def __init__(self, k, tau, parallelism, cplex_path=None, subroutine_name="freq_distributor", seed=42):
@@ -107,9 +105,8 @@ class MRCoresetFairKCenter(object):
             centers, costs, coreset_weights, fairness_constraints, self.solver_cmd)
 
         # Step 4. Assign the input points to the centers found before
-        centers, assignment = assign_original_points(
-            self.k, colors, coreset_proxy, coreset_weights,
-            coreset_ids, coreset_centers, coreset_assignment)
+        centers, assignment = build_assignment(
+            colors, coreset_proxy, coreset_ids, coreset_centers, coreset_assignment)
         self.assignment = assignment
         self.centers = centers
         self.time_assignment_s = time.time() - start - self.time_coreset_s
@@ -130,31 +127,31 @@ class BeraEtAlMRFairKCenter(MRCoresetFairKCenter):
 
 if __name__ == "__main__":
     import pandas as pd
-    import assess
     import datasets
-    import kcenter
+    import assess
 
     logging.basicConfig(level=logging.INFO)
 
-    cplex_path = "/home/ceccarello/opt/cplex/cplex/bin/x86-64_linux/cplex"
+    cplex_path = "cplex" # Assume it's on $PATH
 
     k = 32
     delta = 0.01
-    dataset = "census1990"
+    dataset = "athlete"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
 
     tau = int(k*32)
     logging.info("Tau is %d", tau)
     df = []
-    for parallelism in [2,4,8,16,32]:
+    for parallelism in [2,4,8,16]:
         algo = MRCoresetFairKCenter(k, tau, parallelism, cplex_path)
 
         assignment = algo.fit_predict(data, colors, fairness_constraints)
         df.append({
             "parallelism": parallelism,
             "time": algo.time(),
-            "coreset_time": algo.additional_metrics()["time_coreset_s"]
+            "coreset_time": algo.additional_metrics()["time_coreset_s"],
+            "radius": assess.radius(data, algo.centers, assignment)
         })
     df = pd.DataFrame(df)
     print(df)

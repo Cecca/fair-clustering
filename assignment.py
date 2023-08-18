@@ -300,7 +300,7 @@ def weighted_round_assignment(R, n, k, ncolors, costs, input_assignment, weights
 
         return lp, vars
 
-    output_assignment = np.zeros((n, k, ncolors))
+    output_assignment = np.zeros((n, k, ncolors), dtype=np.int64)
 
     orig_weights = weights.copy()
     weights = weights.copy().astype(np.float64)

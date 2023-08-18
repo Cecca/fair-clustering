@@ -4,7 +4,7 @@ from sklearn.metrics import pairwise_distances
 import logging
 import time
 import pulp
-from fairkcenter import greedy_minimum_maximum, build_coreset
+from fairkcenter import greedy_minimum_maximum, build_coreset, build_assignment
 
 import datasets
 from assignment import weighted_fair_assignment, fair_assignment, freq_distributor
@@ -259,50 +259,6 @@ def _greedy_minimum_maximum(data, k, seed=123):
     timer.reset(f"{k} iterations")
     return centers, assignment
 
-
-def assign_original_points(k, colors, proxy, weights, coreset_ids, coreset_centers, coreset_assignment):
-    import assess
-
-    @njit
-    def inner():
-        # coreset_ids[coreset_centers]
-        nproxies, k, ncolors = coreset_assignment.shape
-        # centers = np.ones(k, dtype=np.int32) * 99999999
-        centers = coreset_ids[coreset_centers]
-
-        assignment = np.ones(colors.shape[0], dtype=np.int64) * 99999999
-
-        for c in range(k):
-            for p in range(nproxies):
-                if np.any(coreset_assignment[p, c] > 0):
-                    weight_to_distribute = coreset_assignment[p, c].copy()
-                    proxied = np.nonzero(proxy == p)[0]
-                    for x in proxied:
-                        color = colors[x]
-                        if weight_to_distribute[color] > 0 and assignment[x] > k:
-                            assignment[x] = c
-                            weight_to_distribute[color] -= 1
-                    if np.sum(weight_to_distribute) > 0:
-                        rem = float(np.sum(weight_to_distribute))
-                        print("Weight to distribute", rem)
-                    # assert np.sum(weight_to_distribute) == 0
-
-        return centers, assignment
-
-    t_start = time.time()
-    logging.info("Assigning original points")
-    centers, assignment = inner()
-    logging.info("Assignment of original points took %f seconds",
-                 time.time() - t_start)
-    # check that centers are assigned to their own cluster
-    # print("centers assignment", assignment[centers])
-    # print("cluster sizes     ", assess.cluster_sizes(centers, assignment))
-    # for i, c in enumerate(centers):
-    #     assert assignment[c] == i
-    assert assignment.max() <= k, "there are some unassigned points!"
-    return centers, assignment
-
-
 class CoresetFairKCenter(object):
     def __init__(self, k, tau, cplex_path=None, subroutine_name="freq_distributor", seed=42):
         self.k = k
@@ -365,8 +321,8 @@ class CoresetFairKCenter(object):
             centers, costs, weights, fairness_constraints, self.solver_cmd)
 
         # Step 4. Assign the input points to the centers found before
-        centers, assignment = assign_original_points(
-            self.k, colors, proxy, weights, coreset_ids, coreset_centers, coreset_assignment)
+        centers, assignment = build_assignment(
+            colors, proxy, coreset_ids, coreset_centers, coreset_assignment)
 
         # Step 5. (optional, slow) Find better center locations
         # relocate_centers(X, centers, assignment, self.k)
@@ -427,17 +383,16 @@ if __name__ == "__main__":
 
     k = 32
     delta = 0.01
-    dataset = "4area"
+    dataset = "athlete"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
-    print("dtype", data.dtype)
     n, dims = datasets.dataset_size(dataset)
     # viz.plot_dataset(dataset, "dataset.png")
 
     # Fair
     tau = int(k*32)
     logging.info("Tau is %d", tau)
-    algo = Dummy(k)
+    # algo = Dummy(k)
     algo = CoresetFairKCenter(
         k, tau, cplex_path, seed=1, subroutine_name="freq_distributor")
     # algo = KFC(k, cplex_path, seed=2)
