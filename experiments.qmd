@@ -543,7 +543,18 @@ load_data() |>
 ```{r}
 load_data(mr=TRUE) |>
   filter(k == 32) |>
-  ggplot(aes(parallelism, coreset_time_s, color=algorithm, shape=factor(tau))) +
+  ggplot(aes(parallelism, coreset_time_s, color=algorithm, linetype=factor(tau))) +
+  geom_line() +
+  facet_wrap(vars(dataset)) +
+  scale_y_continuous(trans="log2") +
+  scale_algorithm() +
+  theme_paper()
+```
+
+```{r}
+load_data(mr=TRUE) |>
+  filter(k == 32) |>
+  ggplot(aes(parallelism, scaled_radius, color=algorithm, linetype=factor(tau))) +
   geom_line() +
   facet_wrap(vars(dataset)) +
   scale_algorithm() +
