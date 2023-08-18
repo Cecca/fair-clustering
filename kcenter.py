@@ -199,66 +199,6 @@ def set_eucl(vec, data, sq_norm_vec, sq_norms, out):
     # return res
 
 
-def _test_set_eucl():
-    data = np.random.standard_normal((100, 4))
-    v = data[0]
-    sq_norms = np.zeros(data.shape[0])
-    for i in prange(data.shape[0]):
-        sq_norms[i] = np.dot(data[i], data[i])
-    expected = pairwise_distances(data, v.reshape(1, -1))[:, 0]
-    actual = np.zeros(data.shape[0])
-    set_eucl(v, data, sq_norms[0], sq_norms, actual)
-    assert np.all(np.isclose(expected, actual))
-
-
-@njit()
-def element_wise_minimum(a, b, out):
-    for i in range(a.shape[0]):
-        if a[i] < b[i]:
-            out[i] = a[i]
-        else:
-            out[i] = b[i]
-
-
-class Timer():
-    def __init__(self):
-        self.time = time.time()
-
-    def reset(self, event):
-        elapsed = time.time() - self.time
-        print(event, elapsed)
-        self.time = time.time()
-
-# @njit()
-def _greedy_minimum_maximum(data, k, seed=123):
-    timer = Timer()
-    np.random.seed(seed)
-    sq_norms = np.zeros(data.shape[0])
-    for i in range(data.shape[0]):
-        sq_norms[i] = np.dot(data[i], data[i])
-    timer.reset("sq_norms")
-    first_center = np.random.choice(data.shape[0])
-    centers = np.zeros(k, np.int32)
-    centers[0] = first_center
-    distances = np.zeros(data.shape[0])
-    distances_to_new_center = np.zeros(data.shape[0])
-    set_eucl(data[first_center], data,
-             sq_norms[first_center], sq_norms, distances)
-    assignment = np.zeros(data.shape[0], np.int32)
-    timer.reset("setup")
-    for idx in range(1, k):
-        farthest = np.argmax(distances)
-        centers[idx] = farthest
-        set_eucl(
-            data[farthest], data, sq_norms[farthest], sq_norms, distances_to_new_center)
-        # update the assignment if we found a closest center
-        assignment[distances_to_new_center < distances] = idx
-        # update the distances
-
-        element_wise_minimum(distances_to_new_center, distances, distances)
-    timer.reset(f"{k} iterations")
-    return centers, assignment
-
 class CoresetFairKCenter(object):
     def __init__(self, k, tau, cplex_path=None, subroutine_name="freq_distributor", seed=42):
         self.k = k
