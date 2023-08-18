@@ -2,7 +2,12 @@ Bootstrap: docker
 From: ubuntu:jammy-20230308
 
 %files
-  env.yaml /env.yaml
+  env.yaml /app/env.yaml
+  src /app
+  Cargo.toml /app
+  pyproject.toml /app
+  Cargo.lock /app
+
 
 %post
   # Install minimal dependencies
@@ -21,9 +26,12 @@ From: ubuntu:jammy-20230308
   micromamba activate
 
   # Install the packages we want, from the env.yaml file
-  micromamba install -y -q -n base -f /env.yaml
+  micromamba install -y -q -n base -f /app/env.yaml
 
   micromamba clean --all --yes
+
+  cd /app
+  maturin develop --release
 
 %environment
   # Environment available at runtime, enriched by the 
@@ -35,5 +43,5 @@ From: ubuntu:jammy-20230308
 # The `runscript` section allows to specify the command to be 
 # executed by default when the container is run
 %runscript
-  python
+  python $@
 

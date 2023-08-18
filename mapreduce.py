@@ -134,20 +134,20 @@ if __name__ == "__main__":
     import datasets
     import kcenter
 
-    logging.basicConfig(level=logging.WARNING)
+    logging.basicConfig(level=logging.INFO)
 
-    cplex_path = "/home/matteo/opt/cplex/cplex/bin/x86-64_linux/cplex"
+    cplex_path = "/home/ceccarello/opt/cplex/cplex/bin/x86-64_linux/cplex"
 
     k = 32
     delta = 0.01
-    dataset = "athlete"
+    dataset = "census1990"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
 
     tau = int(k*32)
     logging.info("Tau is %d", tau)
     df = []
-    for parallelism in [2, 4, 8]:
+    for parallelism in [1, 2, 4, 8, 16]:
         algo = MRCoresetFairKCenter(k, tau, parallelism, cplex_path)
 
         assignment = algo.fit_predict(data, colors, fairness_constraints)
