@@ -36,11 +36,11 @@ scale_algorithm <- function() {
     "coreset" = "#5778a4",
     "coreset-MR" = "#5778a4",
     "KFC" = "#e49444",
-    "unfair" = "#d1615d",
-    "Bera-et-al" = "#85b6b2",
-    "Bera-et-al-MR" = "#85b6b2",
+    "unfair" = "#85b6b2",
+    "Bera-et-al" = "#d1615d",
+    "Bera-et-al-MR" = "#d1615d",
     "dummy" = "black"
-  ))
+  ), aesthetics=c("color", "fill"))
 }
 
 imgdir <- "imgs"
@@ -540,27 +540,184 @@ load_data() |>
   write_file("figs/violation-k32-tau32.tex")
 ```
 
+### MapReduce experiments
+
 ```{r}
-load_data(mr=TRUE) |>
-  filter(k == 32) |>
-  ggplot(aes(parallelism, coreset_time_s, color=algorithm, linetype=factor(tau))) +
-  geom_line() +
-  facet_wrap(vars(dataset)) +
-  scale_y_continuous(trans="log2") +
-  scale_algorithm() +
-  theme_paper()
+plot_scalability <- function(kval, ytitle=TRUE) {
+  if(ytitle) {
+    axis_title_element <- element_text()
+    strip_text_element <- element_blank()
+  } else {
+    axis_title_element <- element_blank()
+    strip_text_element <- element_text()
+  }
+
+  fixed_final_size <- 
+    load_data(mr=TRUE) |>
+    filter(k == kval) |>
+    filter(parallelism %in% c(2,4,8,16)) |>
+    select(dataset, k, parallelism, tau, algorithm, time_s, coreset_time_s) |>
+    mutate(final_coreset_size = k * tau * parallelism) |>
+    arrange(dataset, algorithm, final_coreset_size) |>
+    print(n=100) |>
+    filter(algorithm == "coreset-MR") |>
+    filter(final_coreset_size == k*16)
+  load_data(mr=TRUE) |>
+    filter(k == kval) |>
+    filter(tau %in% c(1, 2, 4, 8)) |>
+    filter(parallelism %in% c(2,4,8,16)) |>
+    ggplot(aes(parallelism, time_s, color=algorithm, linetype=factor(tau))) +
+    # geom_area(
+    #   aes(parallelism, time_s - coreset_time_s, fill=algorithm),
+    #   inherit.aes=F,
+    #   alpha=0.4,
+    #   data=fixed_final_size
+    # ) +
+    # geom_area(
+    #   aes(parallelism, time_s - coreset_time_s, fill=algorithm),
+    #   inherit.aes=F,
+    #   alpha=0.4,
+    #   data = ~filter(., algorithm == "Bera-et-al-MR")
+    # ) +
+    geom_line() +
+    geom_line(
+      linetype="solid",
+      color="white",
+      data=fixed_final_size,
+      linewidth=2
+    ) +
+    geom_line(
+      linetype="solid",
+      data=fixed_final_size,
+      linewidth=1.2
+    ) +
+    geom_point() +
+    geom_text(
+      aes(label = tau),
+      hjust=0,
+      nudge_x=.1,
+      show.legend=FALSE,
+      data = ~filter(., parallelism == 16, algorithm == "coreset-MR", tau > 1)
+    ) +
+    facet_grid(vars(dataset), vars(k), scales="free_y") +
+    scale_y_continuous(trans="identity") +
+    scale_x_continuous(trans="log2", limits=c(2, 22)) +
+    scale_algorithm() +
+    guides(linetype = "none") +
+    labs(
+      linetype = "tau",
+      color = "algorithm",
+      y = "total time (s)"
+    ) +
+    theme_paper() +
+    theme(
+      axis.title.y=axis_title_element,
+      strip.text.y=strip_text_element
+    )
+}
+p1 <- plot_scalability(kval = 32)
+p2 <- plot_scalability(kval = 100, ytitle=FALSE)
+legend = cowplot::get_legend(p1)
+p1 <- p1 + theme(
+  legend.position='none'
+)
+p2 <- p2 + theme(legend.position='none')
+p <- cowplot::plot_grid(
+  cowplot::plot_grid( p1, p2, align="h"),
+  legend, 
+  ncol=1,
+  rel_heights=c(18,1)
+)
+ggsave("figs/scalability.png", dpi=300, width=5, height=6)
 ```
 
 ```{r}
-load_data(mr=TRUE) |>
-  filter(k == 32) |>
-  ggplot(aes(parallelism, scaled_radius, color=algorithm, linetype=factor(tau))) +
-  geom_line() +
-  facet_wrap(vars(dataset)) +
-  scale_algorithm() +
-  theme_paper()
+plot_scalable_radius <- function(kval, ytitle=TRUE) {
+  if(ytitle) {
+    axis_title_element <- element_text()
+    strip_text_element <- element_blank()
+  } else {
+    axis_title_element <- element_blank()
+    strip_text_element <- element_text()
+  }
+
+  fixed_final_size <- 
+    load_data(mr=TRUE) |>
+    filter(k == kval) |>
+    filter(parallelism %in% c(2,4,8,16)) |>
+    select(dataset, k, parallelism, tau, algorithm, scaled_radius) |>
+    mutate(final_coreset_size = k * tau * parallelism) |>
+    arrange(dataset, algorithm, final_coreset_size) |>
+    print(n=100) |>
+    filter(algorithm == "coreset-MR") |>
+    filter(final_coreset_size == k*16)
+  load_data(mr=TRUE) |>
+    filter(k == kval) |>
+    filter(tau %in% c(1, 2, 4, 8)) |>
+    filter(parallelism %in% c(2,4,8,16)) |>
+    ggplot(aes(parallelism, scaled_radius, color=algorithm, linetype=factor(tau))) +
+    # geom_area(
+    #   aes(parallelism, time_s - coreset_time_s, fill=algorithm),
+    #   inherit.aes=F,
+    #   alpha=0.4,
+    #   data=fixed_final_size
+    # ) +
+    # geom_area(
+    #   aes(parallelism, time_s - coreset_time_s, fill=algorithm),
+    #   inherit.aes=F,
+    #   alpha=0.4,
+    #   data = ~filter(., algorithm == "Bera-et-al-MR")
+    # ) +
+    geom_line() +
+    geom_line(
+      linetype="solid",
+      color="white",
+      data=fixed_final_size,
+      linewidth=2
+    ) +
+    geom_line(
+      linetype="solid",
+      data=fixed_final_size,
+      linewidth=1.2
+    ) +
+    geom_point() +
+    geom_text(
+      aes(label = tau),
+      hjust=0,
+      nudge_x=.1,
+      show.legend=FALSE,
+      data = ~filter(., parallelism == 16, algorithm == "coreset-MR", tau > 1)
+    ) +
+    facet_grid(vars(dataset), vars(k), scales="free_y") +
+    scale_y_continuous(trans="identity") +
+    scale_x_continuous(trans="log2", limits=c(2, 22)) +
+    scale_algorithm() +
+    guides(linetype = "none") +
+    labs(
+      linetype = "tau",
+      color = "algorithm",
+      y = "total time (s)"
+    ) +
+    theme_paper() +
+    theme(
+      axis.title.y=axis_title_element,
+      strip.text.y=strip_text_element
+    )
+}
+p1 <- plot_scalable_radius(kval = 32)
+p2 <- plot_scalable_radius(kval = 100, ytitle=FALSE)
+legend = cowplot::get_legend(p1)
+p1 <- p1 + theme(
+  legend.position='none'
+)
+p2 <- p2 + theme(legend.position='none')
+p <- cowplot::plot_grid(
+  cowplot::plot_grid( p1, p2, align="h"),
+  legend, 
+  ncol=1,
+  rel_heights=c(18,1)
+)
+ggsave("figs/scalability-radius.png", dpi=300, width=5, height=6)
 ```
-
-
 
 

@@ -10,3 +10,10 @@ update_images:
 
 preview:
   ./analysis.sif experiments.qmd
+
+console:
+  apptainer exec ./analysis.sif radian
+
+build-analysis-container:
+  apptainer build --force analysis.sif analysis.def
+
