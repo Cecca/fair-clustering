@@ -721,3 +721,44 @@ ggsave("figs/scalability-radius.png", dpi=300, width=5, height=6)
 ```
 
 
+## Plots for the presentation
+
+
+```{r fig-time-vs-radius-smaller}
+load_data() |>
+  filter(
+    k == 32,
+    algorithm != "dummy",
+    algorithm != "Bera-et-al",
+    dataset %in% c("athlete", "diabetes")
+  ) |>
+  arrange(dataset, k, algorithm, tau) |>
+  ggplot(aes(scaled_radius, time_s, color=algorithm, shape=algorithm)) +
+  geom_point() +
+  scale_algorithm() +
+labs(x = "scaled radius", y = "time (s)") +
+  facet_wrap(vars(dataset), scales="free", ncol=5) +
+  theme_paper()
+ggsave("presentation/figs/time-vs-radius-k32-small.png", 
+  dpi=300, width=6, height=4)
+```
+
+```{r fig-time-vs-radius-larger}
+load_data() |>
+  filter(
+    k == 32,
+    algorithm != "dummy",
+    algorithm != "Bera-et-al",
+    dataset %in% c("hmda", "census1990")
+  ) |>
+  arrange(dataset, k, algorithm, tau) |>
+  ggplot(aes(scaled_radius, time_s, color=algorithm, shape=algorithm)) +
+  geom_point() +
+  scale_algorithm() +
+labs(x = "scaled radius", y = "time (s)") +
+  facet_wrap(vars(dataset), scales="free", ncol=5) +
+  theme_paper()
+ggsave("presentation/figs/time-vs-radius-k32-larger.png", 
+  dpi=300, width=6, height=4)
+```
+

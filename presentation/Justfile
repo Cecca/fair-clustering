@@ -1,0 +1,8 @@
+watch:
+  latexmk -pdflua -quiet -pdflatex="pdflatex -synctex=1 -interaction=nonstopmode" -pvc -bibtex alacarte.tex
+
+oneshot:
+  latexmk -pdflua alacarte.tex
+
+clean:
+  latexmk -C alacarte.tex
