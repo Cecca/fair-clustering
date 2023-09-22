@@ -41,19 +41,6 @@ def evaluate(dataset, delta, algo, k, ofile):
         results.save_timeout(dataset, algo.name(), k,
                              delta, algo.attrs(), TIMEOUT_SECS)
 
-def warmup(cplex_path):
-    logging.basicConfig(level=logging.WARNING)
-    k = 3
-    delta = 0.0
-    dataset = "random_dbg"
-    data, colors, fairness_constraints = datasets.load(
-        dataset, 0, delta)
-    n, dims = datasets.dataset_size(dataset)
-    tau = 10
-    algo = kcenter.CoresetFairKCenter(k, tau, cplex_path, seed=2)
-    algo.fit_predict(data, colors, fairness_constraints)
-    logging.basicConfig(level=logging.INFO)
-
 
 def delta_influence():
     ofile = "results.hdf5"
@@ -101,21 +88,20 @@ def exhaustive():
 
 def mr_experiments():
     ofile = "results.hdf5"
-    ks = [32]
+    ks = [32, 100]
     deltas = [0.01]
     all_datasets = ["census1990", "hmda", "athlete"]
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
-        for threads in [2, 4, 8, 16, 32]:
-            master = f"local[{threads}]"
+        for threads in [2, 4, 8, 16]:
             algos = [
                 mapreduce.BeraEtAlMRFairKCenter(
-                    k, master, cplex_path, seed=seed)
+                    k, threads, cplex_path, seed=seed)
                 for seed in [1]
             ] + [
                 mapreduce.MRCoresetFairKCenter(
-                    k, tau, master, cplex_path, seed=seed)
-                for tau in [2*k, 8*k, 32*k, 64*k, 128*k]
+                    k, tau, threads, cplex_path, seed=seed)
+                for tau in [(16*k)//threads, 2*k, 4*k, 8*k]
                 for seed in [1]
                 if tau <= n
             ]
@@ -129,7 +115,6 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 2:
         cplex_path = sys.argv[1]
-        warmup(cplex_path)
     else:
         cplex_path = None
 

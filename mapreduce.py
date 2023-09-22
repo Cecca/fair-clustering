@@ -132,11 +132,11 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    cplex_path = "cplex" # Assume it's on $PATH
+    cplex_path = "/home/ceccarello/opt/cplex/cplex/bin/x86-64_linux/cplex"
 
     k = 32
     delta = 0.01
-    dataset = "athlete"
+    dataset = "census1990"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
 
