@@ -15,6 +15,44 @@ fn eucl(a: &ArrayView1<f64>, b: &ArrayView1<f64>, sq_norm_a: f64, sq_norm_b: f64
     (sq_norm_a + sq_norm_b - 2.0 * a.dot(b)).sqrt()
 }
 
+/// returns the distance and the index in `set_indices` of the first point within `threshold`
+fn set_eucl_threshold(
+    data: &ArrayView2<f64>,
+    sq_norms: &Array1<f64>,
+    set_indices: &[usize],
+    v: &ArrayView1<f64>,
+    v_sq_norm: f64,
+    threshold: f64,
+) -> Option<(f64, usize)> {
+    for (idx, i) in set_indices.iter().enumerate() {
+        let d = eucl(v, &data.row(*i), v_sq_norm, sq_norms[*i]);
+        if d <= threshold {
+            return Some((d, idx));
+        }
+    }
+    None
+}
+
+fn find_radius_range(data: &ArrayView2<f64>, k: usize) -> (f64, f64) {
+    let n = data.shape()[0];
+    let sq_norms = compute_sq_norms(&data);
+    let mut diam = 0.0f64;
+    for i in 0..n {
+        let d = eucl(&data.row(0), &data.row(i), sq_norms[0], sq_norms[i]);
+        diam = diam.max(d);
+    }
+
+    let mut minradius = std::f64::INFINITY;
+    for i in 0..(k + 1) {
+        for j in (i + 1)..k {
+            let d = eucl(&data.row(i), &data.row(j), sq_norms[i], sq_norms[j]);
+            minradius = minradius.min(d);
+        }
+    }
+
+    (minradius, diam)
+}
+
 fn argmax(v: &Array1<f64>) -> usize {
     let mut i = 0;
     let mut m = v[i];
@@ -121,6 +159,67 @@ impl Coreset {
             proxy,
             weights,
         }
+    }
+
+    fn new_streaming(
+        data: &ArrayView2<f64>,
+        guess_step: f64,
+        k: usize,
+        tau: usize,
+        colors: &ArrayView1<i64>,
+        ncolors: usize,
+    ) -> Self {
+        // estimate upper and lower bound of the radius in the dataset
+        let (lower, upper) = find_radius_range(data, k);
+
+        let sq_norms = compute_sq_norms(data);
+
+        // set up a log number of instances
+        let mut guess = lower;
+        while guess <= upper {
+            // for each instance, go through the data points, and assign them
+            let mut point_ids = Vec::new();
+            let mut weights = Array2::<u64>::zeros((tau, ncolors));
+            let mut proxy = Array1::zeros(data.nrows());
+            let mut fail = false;
+
+            for i in 0..data.nrows() {
+                if let Some((_, earliest)) = set_eucl_threshold(
+                    &data,
+                    &sq_norms,
+                    &point_ids,
+                    &data.row(i),
+                    sq_norms[i],
+                    2.0 * guess,
+                ) {
+                    weights[(earliest, colors[i] as usize)] += 1;
+                    proxy[i] = earliest;
+                } else {
+                    point_ids.push(i);
+                }
+                if point_ids.len() > tau {
+                    fail = true;
+                    break;
+                }
+            }
+
+            if !fail {
+                let point_ids = Array1::from_vec(point_ids);
+                let mut points = Array2::<f64>::zeros((point_ids.len(), data.ncols()));
+                for (idx, point_id) in point_ids.iter().enumerate() {
+                    points.slice_mut(s![idx, ..]).assign(&data.row(*point_id));
+                }
+                return Self {
+                    point_ids,
+                    points,
+                    proxy,
+                    weights,
+                };
+            }
+            guess *= guess_step;
+        }
+
+        unreachable!()
     }
 
     fn compose(&self, other: &Self) -> Self {
@@ -272,6 +371,27 @@ fn fairkcenter(_py: Python, m: &PyModule) -> PyResult<()> {
         let colors = colors.as_array();
         let ncolors: usize = *colors.iter().max().unwrap() as usize + 1;
         let coreset = Coreset::new(&data.as_array(), tau, &colors, ncolors, None);
+        coreset.into_pytuple(py)
+    }
+
+    #[pyfn(m)]
+    fn streaming_build_coreset<'py>(
+        py: Python<'py>,
+        data: PyReadonlyArray2<f64>,
+        guess_step: f64,
+        k: usize,
+        tau: usize,
+        colors: PyReadonlyArray1<i64>,
+    ) -> PyResult<(
+        &'py PyArray1<usize>,
+        &'py PyArray2<f64>,
+        &'py PyArray1<usize>,
+        &'py PyArray2<u64>,
+    )> {
+        let colors = colors.as_array();
+        let ncolors: usize = *colors.iter().max().unwrap() as usize + 1;
+        let coreset =
+            Coreset::new_streaming(&data.as_array(), guess_step, k, tau, &colors, ncolors);
         coreset.into_pytuple(py)
     }
 
