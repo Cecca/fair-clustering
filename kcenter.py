@@ -81,6 +81,7 @@ class Dummy(object):
 
     def fit_predict(self, X, colors, _fairness_constraints_unused):
         start = time.time()
+        np.random.seed(self.seed)
 
         sq_norms = np.zeros(X.shape[0])
         for i in range(X.shape[0]):
@@ -107,7 +108,8 @@ class Dummy(object):
         assignment = np.zeros(X.shape[0], dtype=np.int32)
         for (id, cluster) in clusters.items():
             assignment[cluster] = id
-            centers.append(find_best_center(X, np.array(cluster), sq_norms)[0])
+            c = np.random.choice(cluster)
+            centers.append(c)
 
         self.centers = np.array(centers)
         self.assignment = assignment
@@ -332,9 +334,9 @@ if __name__ == "__main__":
     # Fair
     tau = int(k*32)
     logging.info("Tau is %d", tau)
-    # algo = Dummy(k)
-    algo = CoresetFairKCenter(
-        k, tau, cplex_path, seed=1, subroutine_name="freq_distributor")
+    algo = Dummy(k)
+    # algo = CoresetFairKCenter(
+    #     k, tau, cplex_path, seed=1, subroutine_name="freq_distributor")
     # algo = KFC(k, cplex_path, seed=2)
     # algo = BeraEtAlKCenter(k, cplex_path, seed=2)
     print(f"{algo.name()} ==============")
