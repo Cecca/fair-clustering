@@ -49,6 +49,7 @@ fn find_radius_range(data: &ArrayView2<f64>, k: usize) -> (f64, f64) {
             minradius = minradius.min(d);
         }
     }
+    assert!(minradius > 0.0);
 
     (minradius, diam)
 }
@@ -169,6 +170,8 @@ impl Coreset {
         colors: &ArrayView1<i64>,
         ncolors: usize,
     ) -> Self {
+        let start = Instant::now();
+        dbg!(k);
         // estimate upper and lower bound of the radius in the dataset
         let (lower, upper) = find_radius_range(data, k);
 
@@ -177,6 +180,7 @@ impl Coreset {
         // set up a log number of instances
         let mut guess = lower;
         while guess <= upper {
+            println!("guess {} tau {}", guess, tau);
             // for each instance, go through the data points, and assign them
             let mut point_ids = Vec::new();
             let mut weights = Array2::<u64>::zeros((tau, ncolors));
@@ -196,19 +200,26 @@ impl Coreset {
                     proxy[i] = earliest;
                 } else {
                     point_ids.push(i);
-                }
-                if point_ids.len() > tau {
-                    fail = true;
-                    break;
+                    if point_ids.len() > tau {
+                        fail = true;
+                        break;
+                    }
+                    let earliest = point_ids.len() - 1; // the earliest is itself
+                    proxy[i] = earliest;
+                    weights[(earliest, colors[i] as usize)] = 1;
                 }
             }
 
             if !fail {
+
                 let point_ids = Array1::from_vec(point_ids);
                 let mut points = Array2::<f64>::zeros((point_ids.len(), data.ncols()));
                 for (idx, point_id) in point_ids.iter().enumerate() {
                     points.slice_mut(s![idx, ..]).assign(&data.row(*point_id));
                 }
+                let weights = weights.slice(s![0..point_ids.shape()[0], ..]).to_owned();
+                assert_eq!(weights.sum(), data.nrows() as u64);
+                eprintln!("Streaming completed in {:?}", start.elapsed());
                 return Self {
                     point_ids,
                     points,
@@ -307,28 +318,25 @@ fn build_assignment(
 ) -> (Array1<usize>, Array1<usize>) {
     let shp = coreset_assignment.shape();
     let n = colors.len();
-    let nproxies = shp[0];
     let k = shp[1];
 
     let centers = coreset_centers.mapv(|c| coreset_ids[c]);
     let mut assignment = Array1::<usize>::ones(n) * 9999999;
 
-    for c in 0..k {
-        for p in 0..nproxies {
-            let mut weight_to_distribute = coreset_assignment.slice_mut(s![p, c, ..]);
-            if weight_to_distribute.iter().any(|w| *w > 0) {
-                for x in 0..n {
-                    if proxy[x] == p {
-                        let color = colors[x] as usize;
-                        if weight_to_distribute[color] > 0 && assignment[x] > k {
-                            assignment[x] = c;
-                            weight_to_distribute[color] -= 1;
-                        }
-                    }
-                }
+    for x in 0..n {
+        let p = proxy[x];
+        let mut weight_to_distribute = coreset_assignment.slice_mut(s![p, .., colors[x] as usize]);
+        for c in 0..k {
+            if weight_to_distribute[c] > 0 {
+                assignment[x] = c;
+                weight_to_distribute[c] -= 1;
+                break;
             }
         }
+        assert!(assignment[x] < k, "point {}/{} was not assigned!", x, n);
     }
+
+    println!("{:?}", coreset_assignment);
 
     assert!(
         *assignment.iter().max().unwrap() < k,

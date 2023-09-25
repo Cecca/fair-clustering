@@ -479,6 +479,7 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints, solve
             assignment = inner_weighted_fair_assignment(
                 R, costs, weights, fairness_contraints, solver, centers)
             if low == high:
+                assert assignment is not None
                 return assignment, R
             if assignment is None:
                 low = mid + 1
@@ -495,6 +496,7 @@ def weighted_fair_assignment(centers, costs, weights, fairness_contraints, solve
         return last_valid, last_R
 
     wassignment, R = binary_search()
+    assert wassignment is not None
     fradius = _weighted_assignment_radius(costs, centers, wassignment)
     logging.info("Radius of the fractional weight assignment %f", fradius)
 
@@ -585,7 +587,8 @@ def inner_freq_distributor(R, costs, weights, fairness_constraints, centers_ids,
     try:
         lp.solve(solver)
         status = lp.status
-    except PulpSolverError:
+    except PulpSolverError as e:
+        print(e)
         status = -1
 
     if LpStatus[status] == "Optimal":
