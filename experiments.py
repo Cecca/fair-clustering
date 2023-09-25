@@ -116,7 +116,7 @@ def mr_experiments():
 
 def streaming_experiments():
     ofile = "results.hdf5"
-    ks = [32, 100]
+    ks = [32]
     deltas = [0.01]
     all_datasets = ["athlete", "census1990", "hmda"]
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
@@ -128,7 +128,7 @@ def streaming_experiments():
                 for seed in [1]
                 for epsilon in [0.5, 0.1, 0.05, 0.01]
             ] + [
-                mapreduce.StreamingCoresetFairKCenter(
+                streaming.StreamingCoresetFairKCenter(
                     k, k*tau, cplex_path, seed=seed)
                 for tau in [8, 32, 128, 512]
                 for seed in [1]
