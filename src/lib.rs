@@ -171,7 +171,6 @@ impl Coreset {
         ncolors: usize,
     ) -> Self {
         let start = Instant::now();
-        dbg!(k);
         // estimate upper and lower bound of the radius in the dataset
         let (lower, upper) = find_radius_range(data, k);
 
@@ -180,7 +179,6 @@ impl Coreset {
         // set up a log number of instances
         let mut guess = lower;
         while guess <= upper {
-            println!("guess {} tau {}", guess, tau);
             // for each instance, go through the data points, and assign them
             let mut point_ids = Vec::new();
             let mut weights = Array2::<u64>::zeros((tau, ncolors));
@@ -211,7 +209,16 @@ impl Coreset {
             }
 
             if !fail {
-
+                if point_ids.len() < k {
+                    // add arbitrary points, with 0 weight
+                    let mut i = data.nrows() - 1;
+                    while point_ids.len() < k {
+                        if !point_ids.contains(&i) {
+                            point_ids.push(i);
+                        }
+                        i -= 1;
+                    }   
+                }
                 let point_ids = Array1::from_vec(point_ids);
                 let mut points = Array2::<f64>::zeros((point_ids.len(), data.ncols()));
                 for (idx, point_id) in point_ids.iter().enumerate() {
@@ -335,8 +342,6 @@ fn build_assignment(
         }
         assert!(assignment[x] < k, "point {}/{} was not assigned!", x, n);
     }
-
-    println!("{:?}", coreset_assignment);
 
     assert!(
         *assignment.iter().max().unwrap() < k,
