@@ -112,6 +112,56 @@ fn greedy_minimum_maximum(data: &ArrayView2<f64>, k: usize) -> (Array1<usize>, A
     (centers, assignment)
 }
 
+struct StreamingInstance {
+    guess: f64,
+    tau: usize,
+    point_ids: Vec<usize>,
+    weights: Array2<u64>,
+    proxy: Array1<usize>,
+    fail: bool,
+}
+impl StreamingInstance {
+    fn new(guess: f64, data: &ArrayView2<f64>, tau: usize, ncolors: usize) -> Self {
+        let point_ids = Vec::new();
+        let weights = Array2::<u64>::zeros((tau, ncolors));
+        let proxy = Array1::zeros(data.nrows());
+        let fail = false;
+        Self {
+            guess,
+            tau,
+            point_ids,
+            weights,
+            proxy,
+            fail
+        }
+    }
+    fn update(&mut self, data: &ArrayView2<f64>, sq_norms: &Array1<f64>, colors: &ArrayView1<i64>, i: usize) {
+        if self.fail {
+            return;
+        }
+        if let Some((_, earliest)) = set_eucl_threshold(
+            &data,
+            &sq_norms,
+            &self.point_ids,
+            &data.row(i),
+            sq_norms[i],
+            2.0 * self.guess,
+        ) {
+            self.weights[(earliest, colors[i] as usize)] += 1;
+            self.proxy[i] = earliest;
+        } else {
+            self.point_ids.push(i);
+            if self.point_ids.len() > self.tau {
+                self.fail = true;
+                return;
+            }
+            let earliest = self.point_ids.len() - 1; // the earliest is itself
+            self.proxy[i] = earliest;
+            self.weights[(earliest, colors[i] as usize)] = 1;
+        }
+    }
+}
+
 struct Coreset {
     /// The indices of the points in the original dataset
     point_ids: Array1<usize>,
@@ -173,68 +223,49 @@ impl Coreset {
         let start = Instant::now();
         // estimate upper and lower bound of the radius in the dataset
         let (lower, upper) = find_radius_range(data, k);
+        let mut instances = Vec::new();
+        let mut guess = lower;
+        while guess <= upper {
+            instances.push(StreamingInstance::new(guess, data, tau, ncolors));
+            guess *= guess_step;
+        }
+        eprintln!("There are {} streaming instances", instances.len());
 
         let sq_norms = compute_sq_norms(data);
 
-        // set up a log number of instances
-        let mut guess = lower;
-        while guess <= upper {
-            // for each instance, go through the data points, and assign them
-            let mut point_ids = Vec::new();
-            let mut weights = Array2::<u64>::zeros((tau, ncolors));
-            let mut proxy = Array1::zeros(data.nrows());
-            let mut fail = false;
-
-            for i in 0..data.nrows() {
-                if let Some((_, earliest)) = set_eucl_threshold(
-                    &data,
-                    &sq_norms,
-                    &point_ids,
-                    &data.row(i),
-                    sq_norms[i],
-                    2.0 * guess,
-                ) {
-                    weights[(earliest, colors[i] as usize)] += 1;
-                    proxy[i] = earliest;
-                } else {
-                    point_ids.push(i);
-                    if point_ids.len() > tau {
-                        fail = true;
-                        break;
-                    }
-                    let earliest = point_ids.len() - 1; // the earliest is itself
-                    proxy[i] = earliest;
-                    weights[(earliest, colors[i] as usize)] = 1;
-                }
+        for i in 0..data.nrows() {
+            for instance in instances.iter_mut() {
+                instance.update(data, &sq_norms, colors, i);
             }
+        }
 
-            if !fail {
-                if point_ids.len() < k {
+        for mut instance in instances.into_iter() {
+            if !instance.fail {
+                if instance.point_ids.len() < k {
                     // add arbitrary points, with 0 weight
                     let mut i = data.nrows() - 1;
-                    while point_ids.len() < k {
-                        if !point_ids.contains(&i) {
-                            point_ids.push(i);
+                    while instance.point_ids.len() < k {
+                        if !instance.point_ids.contains(&i) {
+                            instance.point_ids.push(i);
                         }
                         i -= 1;
-                    }   
+                    }
                 }
-                let point_ids = Array1::from_vec(point_ids);
+                let point_ids = Array1::from_vec(instance.point_ids);
                 let mut points = Array2::<f64>::zeros((point_ids.len(), data.ncols()));
                 for (idx, point_id) in point_ids.iter().enumerate() {
                     points.slice_mut(s![idx, ..]).assign(&data.row(*point_id));
                 }
-                let weights = weights.slice(s![0..point_ids.shape()[0], ..]).to_owned();
+                let weights = instance.weights.slice(s![0..point_ids.shape()[0], ..]).to_owned();
                 assert_eq!(weights.sum(), data.nrows() as u64);
                 eprintln!("Streaming completed in {:?}", start.elapsed());
                 return Self {
                     point_ids,
                     points,
-                    proxy,
+                    proxy: instance.proxy.clone(),
                     weights,
                 };
             }
-            guess *= guess_step;
         }
 
         unreachable!()

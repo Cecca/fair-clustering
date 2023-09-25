@@ -1,5 +1,7 @@
+import numpy as np
 import sys
 import mapreduce
+import streaming
 import kcenter
 import results
 import datasets
@@ -20,13 +22,16 @@ def timeout_handler(signum, frame):
     raise TimeoutException()
 
 
-def evaluate(dataset, delta, algo, k, ofile):
+def evaluate(dataset, delta, algo, k, ofile, shuffle_seed=None):
     if results.already_run(dataset, algo.name(), k, delta, algo.attrs()):
         return
     logging.info(
         f"Running {algo.name()} with {algo.attrs()} on {dataset} for k={k}")
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
+    if shuffle_seed is not None:
+        rng = np.random.default_rng(shuffle_seed)
+        rng.shuffle(data)
 
     try:
         signal.alarm(TIMEOUT_SECS)
@@ -109,6 +114,30 @@ def mr_experiments():
                 evaluate(dataset, delta, algo, k, ofile)
 
 
+def streaming_experiments():
+    ofile = "results.hdf5"
+    ks = [32, 100]
+    deltas = [0.01]
+    all_datasets = ["athlete", "census1990", "hmda"]
+    for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
+        for seed in [1,2,3,4,5]:
+            n, dim = datasets.dataset_size(dataset)
+            algos = [
+                streaming.BeraEtAlStreamingFairKCenter(
+                    k, epsilon, cplex_path, seed=seed)
+                for seed in [1]
+                for epsilon in [0.5, 0.1, 0.05, 0.01]
+            ] + [
+                mapreduce.StreamingCoresetFairKCenter(
+                    k, k*tau, cplex_path, seed=seed)
+                for tau in [8, 32, 128, 512]
+                for seed in [1]
+                if tau <= n
+            ]
+            for algo in algos:
+                evaluate(dataset, delta, algo, k, ofile, shuffle_seed=seed)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     signal.signal(signal.SIGALRM, timeout_handler)
@@ -120,5 +149,6 @@ if __name__ == "__main__":
 
     #exhaustive()
     #delta_influence()
-    mr_experiments()
+    # mr_experiments()
+    streaming_experiments()
 
