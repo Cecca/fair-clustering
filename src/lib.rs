@@ -121,6 +121,11 @@ struct StreamingInstance {
     fail: bool,
 }
 impl StreamingInstance {
+    fn size_bytes(&self) -> usize {
+        use std::mem::size_of;
+        size_of::<usize>() * (self.point_ids.len() + self.proxy.len())
+            + size_of::<u64>() * self.weights.len()
+    }
     fn new(guess: f64, data: &ArrayView2<f64>, tau: usize, ncolors: usize) -> Self {
         let point_ids = Vec::new();
         let weights = Array2::<u64>::zeros((tau, ncolors));
@@ -132,10 +137,16 @@ impl StreamingInstance {
             point_ids,
             weights,
             proxy,
-            fail
+            fail,
         }
     }
-    fn update(&mut self, data: &ArrayView2<f64>, sq_norms: &Array1<f64>, colors: &ArrayView1<i64>, i: usize) {
+    fn update(
+        &mut self,
+        data: &ArrayView2<f64>,
+        sq_norms: &Array1<f64>,
+        colors: &ArrayView1<i64>,
+        i: usize,
+    ) {
         if self.fail {
             return;
         }
@@ -219,7 +230,7 @@ impl Coreset {
         tau: usize,
         colors: &ArrayView1<i64>,
         ncolors: usize,
-    ) -> Self {
+    ) -> (Self, usize) {
         let start = Instant::now();
         // estimate upper and lower bound of the radius in the dataset
         let (lower, upper) = find_radius_range(data, k);
@@ -239,6 +250,11 @@ impl Coreset {
             }
         }
 
+        let total_size_bytes = instances
+            .iter()
+            .map(|inst| inst.size_bytes())
+            .sum::<usize>();
+
         for mut instance in instances.into_iter() {
             if !instance.fail {
                 if instance.point_ids.len() < k {
@@ -256,15 +272,21 @@ impl Coreset {
                 for (idx, point_id) in point_ids.iter().enumerate() {
                     points.slice_mut(s![idx, ..]).assign(&data.row(*point_id));
                 }
-                let weights = instance.weights.slice(s![0..point_ids.shape()[0], ..]).to_owned();
+                let weights = instance
+                    .weights
+                    .slice(s![0..point_ids.shape()[0], ..])
+                    .to_owned();
                 assert_eq!(weights.sum(), data.nrows() as u64);
                 eprintln!("Streaming completed in {:?}", start.elapsed());
-                return Self {
-                    point_ids,
-                    points,
-                    proxy: instance.proxy.clone(),
-                    weights,
-                };
+                return (
+                    Self {
+                        point_ids,
+                        points,
+                        proxy: instance.proxy.clone(),
+                        weights,
+                    },
+                    total_size_bytes,
+                );
             }
         }
 
@@ -431,12 +453,14 @@ fn fairkcenter(_py: Python, m: &PyModule) -> PyResult<()> {
         &'py PyArray2<f64>,
         &'py PyArray1<usize>,
         &'py PyArray2<u64>,
+        usize,
     )> {
         let colors = colors.as_array();
         let ncolors: usize = *colors.iter().max().unwrap() as usize + 1;
-        let coreset =
+        let (coreset, total_size_bytes) =
             Coreset::new_streaming(&data.as_array(), guess_step, k, tau, &colors, ncolors);
-        coreset.into_pytuple(py)
+        let (ids, points, proxy, weights) = coreset.into_pytuple(py)?;
+        Ok((ids, points, proxy, weights, total_size_bytes))
     }
 
     #[pyfn(m)]

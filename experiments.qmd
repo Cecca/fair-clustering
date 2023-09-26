@@ -35,10 +35,12 @@ scale_algorithm <- function() {
   scale_color_manual(values = c(
     "coreset" = "#5778a4",
     "coreset-MR" = "#5778a4",
+    "coreset-stream" = "#5778a4",
     "KFC" = "#e49444",
     "unfair" = "#85b6b2",
     "Bera-et-al" = "#d1615d",
     "Bera-et-al-MR" = "#d1615d",
+    "Bera-et-al-stream" = "#d1615d",
     "dummy" = "black"
   ), aesthetics=c("color", "fill"))
 }
@@ -56,12 +58,15 @@ dataset_stats <- function() {
   stats
 }
 
-load_data <- function(delta_val = 0.01, mr = FALSE) {
+load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE) {
   con <- DBI::dbConnect(RSQLite::SQLite(), "results.db")
 
   if (mr) {
     algofilter <- "algorithm like '%mr%'"
     parallel_col <- "json_extract(params, '$.parallelism') as parallelism,"
+  } else if (streaming) {
+    algofilter <- "algorithm like '%stream%'"
+    parallel_col <- "1 as parallelism,"
   } else {
     algofilter <- "algorithm not like '%mr%'"
     parallel_col <- "1 as parallelism,"
@@ -90,7 +95,9 @@ load_data <- function(delta_val = 0.01, mr = FALSE) {
         algorithm == "unfair-k-center" ~ "unfair",
         algorithm == "bera-et-al-k-center" ~ "Bera-et-al",
         algorithm == "bera-mr-fair-k-center" ~ "Bera-et-al-MR",
+        algorithm == "bera-streaming-fair-k-center" ~ "Bera-et-al-stream",
         algorithm == "mr-coreset-fair-k-center" ~ "coreset-MR",
+        algorithm == "streaming-coreset-fair-k-center" ~ "coreset-stream",
         T ~ algorithm
       ),
       algorithm = factor(algorithm, ordered=TRUE, levels=c(
@@ -720,6 +727,17 @@ p <- cowplot::plot_grid(
 ggsave("figs/scalability-radius.png", dpi=300, width=5, height=6)
 ```
 
+## Streaming
+
+
+```{r}
+load_data(streaming = TRUE) |>
+  ggplot(aes(tau, scaled_radius)) +
+  geom_point(stat="summary") +
+  geom_line(stat="summary") +
+  facet_wrap(vars(dataset), scale='free')
+```
+
 
 ## Plots for the presentation
 
@@ -761,4 +779,5 @@ labs(x = "scaled radius", y = "time (s)") +
 ggsave("presentation/figs/time-vs-radius-k32-larger.png", 
   dpi=300, width=6, height=4)
 ```
+
 
