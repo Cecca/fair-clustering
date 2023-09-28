@@ -42,10 +42,32 @@ fn find_radius_range(data: &ArrayView2<f64>, k: usize) -> (f64, f64) {
         diam = diam.max(d);
     }
 
+    // get the first k plus one points, without duplicates
+    let mut first_kp1 = Vec::new();
+    first_kp1.push(0);
+    let mut i = 0;
+    while first_kp1.len() < k + 1 && i < data.nrows() {
+        let (d, _) = set_eucl_threshold(
+            data,
+            &sq_norms,
+            &first_kp1,
+            &data.row(i),
+            sq_norms[i],
+            std::f64::INFINITY,
+        )
+        .unwrap();
+        if d > 0.0 {
+            first_kp1.push(i);
+        }
+        i += 1;
+    }
+
     let mut minradius = std::f64::INFINITY;
-    for i in 0..(k + 1) {
-        for j in (i + 1)..k {
-            let d = eucl(&data.row(i), &data.row(j), sq_norms[i], sq_norms[j]);
+    for i in 0..first_kp1.len() {
+        let ii = first_kp1[i];
+        for j in (i + 1)..first_kp1.len() {
+            let jj = first_kp1[j];
+            let d = eucl(&data.row(ii), &data.row(jj), sq_norms[ii], sq_norms[jj]);
             minradius = minradius.min(d);
         }
     }
