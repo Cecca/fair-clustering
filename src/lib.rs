@@ -33,6 +33,25 @@ fn set_eucl_threshold(
     None
 }
 
+fn closest(
+    data: &ArrayView2<f64>,
+    sq_norms: &Array1<f64>,
+    set_indices: &[usize],
+    v: &ArrayView1<f64>,
+    v_sq_norm: f64,
+) -> (f64, usize) {
+    let mut min_dist = std::f64::INFINITY;
+    let mut min_idx = 0;
+    for i in set_indices.iter() {
+        let d = eucl(v, &data.row(*i), v_sq_norm, sq_norms[*i]);
+        if d <= min_dist {
+            min_dist = d;
+            min_idx = *i;
+        }
+    }
+    return (min_dist, min_idx)
+}
+
 fn find_radius_range(data: &ArrayView2<f64>, k: usize) -> (f64, f64) {
     let n = data.shape()[0];
     let sq_norms = compute_sq_norms(&data);
@@ -47,15 +66,13 @@ fn find_radius_range(data: &ArrayView2<f64>, k: usize) -> (f64, f64) {
     first_kp1.push(0);
     let mut i = 0;
     while first_kp1.len() < k + 1 && i < data.nrows() {
-        let (d, _) = set_eucl_threshold(
+        let (d, _) = closest(
             data,
             &sq_norms,
             &first_kp1,
             &data.row(i),
             sq_norms[i],
-            std::f64::INFINITY,
-        )
-        .unwrap();
+        );
         if d > 0.0 {
             first_kp1.push(i);
         }
@@ -68,6 +85,7 @@ fn find_radius_range(data: &ArrayView2<f64>, k: usize) -> (f64, f64) {
         for j in (i + 1)..first_kp1.len() {
             let jj = first_kp1[j];
             let d = eucl(&data.row(ii), &data.row(jj), sq_norms[ii], sq_norms[jj]);
+            assert!(d > 0.0);
             minradius = minradius.min(d);
         }
     }
