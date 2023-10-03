@@ -99,27 +99,26 @@ def mr_experiments():
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
         for threads in [2, 4, 8, 16]:
-            algos = [
-                mapreduce.BeraEtAlMRFairKCenter(
-                    k, threads, cplex_path, seed=seed)
-                for seed in [1]
-            ] + [
-                mapreduce.MRCoresetFairKCenter(
-                    k, tau, threads, cplex_path, seed=seed)
-                for tau in [(16*k)//threads, 2*k, 4*k, 8*k]
-                for seed in [1]
-                if tau <= n
-            ]
-            for algo in algos:
-                evaluate(dataset, delta, algo, k, ofile)
+            for shuffle_seed in [11234,1234,4234,1234,432]:
+                algos = [
+                    mapreduce.BeraEtAlMRFairKCenter(
+                        k, threads, cplex_path, seed=shuffle_seed)
+                ] + [
+                    mapreduce.MRCoresetFairKCenter(
+                        k, tau, threads, cplex_path, seed=shuffle_seed)
+                    for tau in [(16*k)//threads, 2*k, 4*k, 8*k]
+                    if tau <= n
+                ]
+                for algo in algos:
+                    evaluate(dataset, delta, algo, k, ofile, shuffle_seed=shuffle_seed)
 
 
 def streaming_experiments():
     ofile = "results.hdf5"
     ks = [32]
     deltas = [0.01]
-    #all_datasets = ["athlete", "census1990", "hmda"]
-    all_datasets = datasets.datasets()
+    all_datasets = ["athlete", "census1990", "hmda"]
+    #all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         for shuffle_seed in [1,2,3,4,5]:
             n, dim = datasets.dataset_size(dataset)

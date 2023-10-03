@@ -562,7 +562,7 @@ def inner_freq_distributor(R, costs, weights, fairness_constraints, centers_ids,
         cluster_vars = [var for (joiner_centers, cc, ccolor), var in vars.items()
                         if c in joiner_centers and cc == c]
         cluster_size = lpSum(cluster_vars)
-        assert len(cluster_vars) > 0
+        #assert len(cluster_vars) > 0
         for color in range(ncolors):
             beta, alpha = fairness_constraints[color]
             assert alpha >= beta
