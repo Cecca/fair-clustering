@@ -1,4 +1,4 @@
-from fairkcenter import parallel_build_coreset, build_assignment, greedy_minimum_maximum
+from fairkcenter import parallel_build_coreset, parallel_build_coreset_tiny, build_assignment, greedy_minimum_maximum
 from assignment import weighted_fair_assignment, fair_assignment, freq_distributor
 import time
 from sklearn.metrics import pairwise_distances
@@ -21,6 +21,7 @@ class MRCoresetFairKCenter(object):
         self.solver_cmd = pulp.CPLEX_CMD(
             path=cplex_path, msg=False) if cplex_path is not None else pulp.COIN_CMD(msg=False)
         self.parallelism = parallelism
+        self.parallel_subroutine = parallel_build_coreset_tiny
 
     def name(self):
         return "mr-coreset-fair-k-center"
@@ -49,7 +50,7 @@ class MRCoresetFairKCenter(object):
 
         # Build the coreset
         start = time.time()
-        coreset_ids, coreset_points, coreset_proxy, coreset_weights = parallel_build_coreset(
+        coreset_ids, coreset_points, coreset_proxy, coreset_weights = self.parallel_subroutine(
             self.parallelism, X, tau, colors)
         self.time_coreset_s = time.time() - start
         print("Coreset built in", self.time_coreset_s, "seconds")
@@ -83,6 +84,7 @@ class MRCoresetFairKCenter(object):
 class BeraEtAlMRFairKCenter(MRCoresetFairKCenter):
     def __init__(self, k, parallelism, cplex_path=None, seed=42):
         super().__init__(k, k, parallelism, cplex_path, subroutine_name="bera-et-al", seed=seed)
+        self.parallel_subroutine = parallel_build_coreset
 
     def name(self):
         return "bera-mr-fair-k-center"
@@ -92,10 +94,11 @@ if __name__ == "__main__":
     import pandas as pd
     import datasets
     import assess
+    import os
 
     logging.basicConfig(level=logging.INFO)
 
-    cplex_path = "/home/ceccarello/opt/cplex/cplex/bin/x86-64_linux/cplex"
+    cplex_path = os.path.expanduser('~/opt/cplex/cplex/bin/x86-64_linux/cplex')
 
     k = 32
     delta = 0.01
