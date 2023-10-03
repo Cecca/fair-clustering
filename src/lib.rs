@@ -175,8 +175,7 @@ struct StreamingInstance {
 impl StreamingInstance {
     fn size_bytes(&self) -> usize {
         use std::mem::size_of;
-        size_of::<usize>() * (self.point_ids.len() + self.proxy.len())
-            + size_of::<u64>() * self.weights.len()
+        size_of::<usize>() * self.point_ids.len() + size_of::<u64>() * self.weights.len()
     }
     fn new(guess: f64, data: &ArrayView2<f64>, tau: usize, ncolors: usize) -> Self {
         let point_ids = Vec::new();
