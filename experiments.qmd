@@ -13,7 +13,7 @@ making the budget of clusters underutilized.
 
 ```{r definitions}
 library(tidyverse)
-library(ggpattern)
+library(ggrepel)
 library(kableExtra)
 theme_set(theme_bw() + theme(legend.position="bottom"))
 
@@ -63,28 +63,34 @@ load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE) {
 
   if (mr) {
     algofilter <- "algorithm like '%mr%'"
-    parallel_col <- "json_extract(params, '$.parallelism') as parallelism,"
+    additional_col <- "json_extract(params, '$.parallelism') as parallelism, 0 as streaming_memory_bytes,"
   } else if (streaming) {
     algofilter <- "algorithm like '%stream%'"
-    parallel_col <- "1 as parallelism,"
+    additional_col <- "1 as parallelism, json_extract(additional_metrics, '$.streaming_memory_bytes') as streaming_memory_bytes,"
   } else {
-    algofilter <- "algorithm not like '%mr%'"
-    parallel_col <- "1 as parallelism,"
+    algofilter <- "algorithm not like '%mr%' and algorithm not like '%stream%'"
+    additional_col <- "1 as parallelism, 0 as streaming_memory_bytes,"
   }
 
   q <- str_glue(
-      "select *, json_extract(params, '$.tau') / k as tau,
-       {parallel_col}
+      "select *, 
+       json_extract(params, '$.tau') / k as tau,
+       json_extract(params, '$.epsilon') as epsilon,
+       {additional_col}
        cast(additional_metrics -> '$.coreset_radius' as real) as coreset_radius,
        cast(additional_metrics -> '$.time_coreset_s' as real) as coreset_time_s
        from results
        where dataset not like '%std'
        and {algofilter}")
 
+  smallest_radius <- tbl(con, sql("select dataset, k, min(radius) as best_unfair_radius from results group by dataset, k")) |> collect()
+
   results <- tbl(con, sql(q)) |> 
     inner_join(tbl(con, "dataset_stats")) |>
     collect() |>
+    inner_join(smallest_radius) |>
     mutate(
+      scaled_radius = radius / best_unfair_radius,
       dataset = case_when(
         dataset == "reuter_50_50" ~ "reuter",
         T ~ dataset
@@ -104,9 +110,11 @@ load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE) {
         "unfair", 
         "Bera-et-al", 
         "Bera-et-al-MR", 
+        "Bera-et-al-stream", 
         "KFC", 
         "coreset",
         "coreset-MR", 
+        "coreset-stream", 
         "dummy"
       )),
       timeout_s = if_else(time_s > 30*60, 30*60, timeout_s),
@@ -118,16 +126,17 @@ load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE) {
       coreset_size_frac = tau * k / n,
       dataset = fct_reorder(dataset, desc(n))
     ) |>
-    group_by(dataset, k) |>
-    mutate(scaled_radius = radius / min(radius, na.rm=T)) |>
-    ungroup() |>
-    group_by(dataset, algorithm, k, delta, tau, parallelism, timed_out, coreset_size_frac, n, dimensions) |>
+    # group_by(dataset, k) |>
+    # mutate(scaled_radius = radius / min(radius, na.rm=T)) |>
+    # ungroup() |>
+    group_by(dataset, algorithm, k, delta, tau, epsilon, parallelism, timed_out, coreset_size_frac, n, dimensions) |>
     summarise(
       across(c(radius, scaled_radius, coreset_radius, 
-                time_s, coreset_time_s,
+                time_s, coreset_time_s, streaming_memory_bytes
             ), mean),
       additive_violation = max(additive_violation)
     ) |>
+    mutate(streaming_memory_bytes = as.double(streaming_memory_bytes)) |>
     ungroup()
 
   if (!is.na(delta_val)) {
@@ -727,14 +736,85 @@ p <- cowplot::plot_grid(
 ggsave("figs/scalability-radius.png", dpi=300, width=5, height=6)
 ```
 
+```{r scalable-radius}
+baseline <- load_data() |>
+  filter(algorithm %in% c( 'coreset', 'KFC' ), k == 32) |>
+  filter(dataset %in% c('hmda', 'census1990', 'athelete')) |>
+  group_by(dataset) |>
+  slice_min(scaled_radius)
+print(baseline)
+
+taus <- c(32, 64, 128)
+
+load_data(mr=T) |>
+  filter(k==32) |>
+  filter(parallelism %in% c(2,4,8,16)) |>
+  ggplot(aes(parallelism, scaled_radius, group=tau, color=algorithm)) +
+  geom_point(data=~filter(., tau %in% taus)) +
+  geom_line(data=~filter(., tau %in% taus)) +
+  geom_point(data=~filter(., algorithm == 'Bera-et-al-MR')) +
+  geom_line(data=~filter(., algorithm == 'Bera-et-al-MR')) +
+  # geom_hline(aes(yintercept=scaled_radius, color=algorithm), data=baseline) +
+  # geom_text_repel(
+  #   aes(label = tau),
+  #   hjust=0,
+  #   nudge_x=.1,
+  #   show.legend=FALSE,
+  #   direction="y",
+  #   data = ~filter(., parallelism == 16, algorithm == "coreset-MR", tau %in% taus)
+  # ) +
+  facet_wrap(vars(dataset), scales='free_y') +
+  scale_algorithm() +
+  theme_paper()
+ggsave("figs/scalability-radius.png", dpi=300, width=4, height=2)
+```
+
+```{r scalable-time}
+load_data(mr=T) |>
+  filter(k==32) |>
+  filter(parallelism %in% c(2,4,8,16)) |>
+  ggplot(aes(parallelism, time_s, group=tau, color=algorithm)) +
+  geom_point(data=~filter(., tau %in% taus)) +
+  geom_line(data=~filter(., tau %in% taus)) +
+  geom_point(data=~filter(., algorithm == 'Bera-et-al-MR')) +
+  geom_line(data=~filter(., algorithm == 'Bera-et-al-MR')) +
+  # geom_hline(aes(yintercept=scaled_radius, color=algorithm), data=baseline) +
+  # geom_text_repel(
+  #   aes(label = tau),
+  #   hjust=0,
+  #   nudge_x=.1,
+  #   show.legend=FALSE,
+  #   direction="y",
+  #   data = ~filter(., parallelism == 16, algorithm == "coreset-MR", tau %in% taus)
+  # ) +
+  facet_wrap(vars(dataset), scales='free_y') +
+  scale_algorithm() +
+  theme_paper()
+ggsave("figs/scalability.png", dpi=300, width=4, height=2)
+```
+
 ## Streaming
 
 
 ```{r}
+kfc <- load_data() |>
+  filter(algorithm == 'KFC', k == 32)
+
 load_data(streaming = TRUE) |>
-  ggplot(aes(tau, scaled_radius)) +
-  geom_point(stat="summary") +
-  geom_line(stat="summary") +
+  drop_na(streaming_memory_bytes) |>
+  filter(k == 32) |>
+  mutate(
+    param = if_else(is.na(tau), epsilon, tau),
+    bytes_per_point = streaming_memory_bytes / n
+  ) |>
+  arrange(param) |>
+  print() |>
+  ggplot(aes(bytes_per_point, radius, color=algorithm)) +
+  geom_path() +
+  geom_point() +
+  # geom_hline(aes(yintercept=scaled_radius, color=algorithm), data=kfc) +
+  scale_algorithm() +
+  scale_x_log10(labels=scales::number_bytes) +
   facet_wrap(vars(dataset), scale='free')
 ```
 
@@ -754,7 +834,7 @@ load_data() |>
   ggplot(aes(scaled_radius, time_s, color=algorithm, shape=algorithm)) +
   geom_point() +
   scale_algorithm() +
-labs(x = "scaled radius", y = "time (s)") +
+  labs(x = "scaled radius", y = "time (s)") +
   facet_wrap(vars(dataset), scales="free", ncol=5) +
   theme_paper()
 ggsave("presentation/figs/time-vs-radius-k32-small.png", 
