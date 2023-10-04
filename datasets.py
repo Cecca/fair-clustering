@@ -388,7 +388,7 @@ def datasets():
     return names
 
 
-def load(name, color_idx, delta=0.0, prefix=None):
+def load(name, color_idx, delta=0.0, prefix=None, shuffle_seed=None):
     fname = DATASETS[name]()
     logging.debug("Opening %s", fname)
     with h5py.File(fname, "r") as hfp:
@@ -404,6 +404,12 @@ def load(name, color_idx, delta=0.0, prefix=None):
         (p * (1-delta), p / (1-delta))
         for p in color_proportion
     ]
+    if shuffle_seed is not None:
+        rng = np.random.default_rng(shuffle_seed)
+        selector = np.arange(data.shape[0])
+        rng.shuffle(selector)
+        data = data[selector]
+        colors = colors[selector]
     return data, colors, fairness_constraints
 
 

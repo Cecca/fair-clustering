@@ -28,10 +28,7 @@ def evaluate(dataset, delta, algo, k, ofile, shuffle_seed=None):
     logging.info(
         f"Running {algo.name()} with {algo.attrs()} on {dataset} for k={k}")
     data, colors, fairness_constraints = datasets.load(
-        dataset, 0, delta)
-    if shuffle_seed is not None:
-        rng = np.random.default_rng(shuffle_seed)
-        rng.shuffle(data)
+        dataset, 0, delta, shuffle_seed=shuffle_seed)
 
     try:
         signal.alarm(TIMEOUT_SECS)
@@ -41,7 +38,7 @@ def evaluate(dataset, delta, algo, k, ofile, shuffle_seed=None):
 
         results.save_result(ofile, centers, assignment, dataset,
                             algo.name(), k, delta, algo.attrs(),
-                            algo.time(), algo.additional_metrics())
+                            algo.time(), algo.additional_metrics(), shuffle_seed=shuffle_seed)
     except TimeoutException:
         results.save_timeout(dataset, algo.name(), k,
                              delta, algo.attrs(), TIMEOUT_SECS)

@@ -110,14 +110,12 @@ if __name__ == "__main__":
     k = 32
     delta = 0.01
     dataset = "athlete"
-    data, colors, fairness_constraints = datasets.load(
-        dataset, 0, delta)
 
-    rng = np.random.default_rng()
     df = []
-    for _ in range(1):
-        rng.shuffle(data)
-        for tau in [8, 32, 128, 512]:
+    for shuffle_seed in range(4):
+        data, colors, fairness_constraints = datasets.load(
+            dataset, 0, delta, shuffle_seed=shuffle_seed)
+        for tau in [8, 32, 128, 512, 4096]:
             algo = StreamingCoresetFairKCenter(k, k*tau, cplex_path, subroutine_name="freq_distributor")
             assignment = algo.fit_predict(data, colors, fairness_constraints)
             res = {
@@ -129,18 +127,19 @@ if __name__ == "__main__":
             res.update(algo.additional_metrics())
             df.append(res)
 
-        for epsilon in [0.5, 0.1, 0.05, 0.01]:
-            algo = BeraEtAlStreamingFairKCenter(k, epsilon, cplex_path)
-            assignment = algo.fit_predict(data, colors, fairness_constraints)
-            res = {
-                "algorithm": algo.name(),
-                "param": epsilon,
-                "time": algo.time(),
-                "radius": assess.radius(data, algo.centers, assignment)
-            }
-            res.update(algo.additional_metrics())
-            df.append(res)
+        # for epsilon in [0.5, 0.1, 0.05, 0.01]:
+        #     algo = BeraEtAlStreamingFairKCenter(k, epsilon, cplex_path)
+        #     assignment = algo.fit_predict(data, colors, fairness_constraints)
+        #     res = {
+        #         "algorithm": algo.name(),
+        #         "param": epsilon,
+        #         "time": algo.time(),
+        #         "radius": assess.radius(data, algo.centers, assignment)
+        #     }
+        #     res.update(algo.additional_metrics())
+        #     df.append(res)
 
     df = pd.DataFrame(df)
+    print(df)
     print(df.groupby(['algorithm', 'param']).mean())
 

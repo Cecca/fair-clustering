@@ -18,13 +18,6 @@ library(kableExtra)
 theme_set(theme_bw() + theme(legend.position="bottom"))
 
 theme_paper <- function() {
-  # axis_line <- element_line(linewidth=0.1, color="black")
-  # theme_minimal() +
-  #   theme(
-  #     legend.position="bottom",
-  #     axis.line.x.bottom = axis_line,
-  #     axis.line.y.left = axis_line
-  #   )
   theme_bw() +
     theme(
       legend.position = "bottom"
@@ -58,7 +51,7 @@ dataset_stats <- function() {
   stats
 }
 
-load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE) {
+load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE, do_summarise = TRUE) {
   con <- DBI::dbConnect(RSQLite::SQLite(), "results.db")
 
   if (mr) {
@@ -125,19 +118,20 @@ load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE) {
       img_path = imgpath(hdf5_key),
       coreset_size_frac = tau * k / n,
       dataset = fct_reorder(dataset, desc(n))
-    ) |>
-    # group_by(dataset, k) |>
-    # mutate(scaled_radius = radius / min(radius, na.rm=T)) |>
-    # ungroup() |>
-    group_by(dataset, algorithm, k, delta, tau, epsilon, parallelism, timed_out, coreset_size_frac, n, dimensions) |>
-    summarise(
-      across(c(radius, scaled_radius, coreset_radius, 
-                time_s, coreset_time_s, streaming_memory_bytes
-            ), mean),
-      additive_violation = max(additive_violation)
-    ) |>
-    mutate(streaming_memory_bytes = as.double(streaming_memory_bytes)) |>
-    ungroup()
+    )
+
+  if (do_summarise) {
+    results <- results |>
+      group_by(dataset, algorithm, k, delta, tau, epsilon, parallelism, timed_out, coreset_size_frac, n, dimensions) |>
+      summarise(
+        across(c(radius, scaled_radius, coreset_radius, 
+                  time_s, coreset_time_s, streaming_memory_bytes
+              ), mean),
+        additive_violation = max(additive_violation)
+      ) |>
+      mutate(streaming_memory_bytes = as.double(streaming_memory_bytes)) |>
+      ungroup()
+  }
 
   if (!is.na(delta_val)) {
     message(paste("filtering by delta=", delta_val))
@@ -631,20 +625,20 @@ plot_scalability <- function(kval, ytitle=TRUE) {
       strip.text.y=strip_text_element
     )
 }
-p1 <- plot_scalability(kval = 32)
-p2 <- plot_scalability(kval = 100, ytitle=FALSE)
-legend = cowplot::get_legend(p1)
-p1 <- p1 + theme(
-  legend.position='none'
-)
-p2 <- p2 + theme(legend.position='none')
-p <- cowplot::plot_grid(
-  cowplot::plot_grid( p1, p2, align="h"),
-  legend, 
-  ncol=1,
-  rel_heights=c(18,1)
-)
-ggsave("figs/scalability.png", dpi=300, width=5, height=6)
+# p1 <- plot_scalability(kval = 32)
+# p2 <- plot_scalability(kval = 100, ytitle=FALSE)
+# legend = cowplot::get_legend(p1)
+# p1 <- p1 + theme(
+#   legend.position='none'
+# )
+# p2 <- p2 + theme(legend.position='none')
+# p <- cowplot::plot_grid(
+#   cowplot::plot_grid( p1, p2, align="h"),
+#   legend, 
+#   ncol=1,
+#   rel_heights=c(18,1)
+# )
+# ggsave("figs/scalability.png", dpi=300, width=5, height=6)
 ```
 
 ```{r}
@@ -720,20 +714,20 @@ plot_scalable_radius <- function(kval, ytitle=TRUE) {
       strip.text.y=strip_text_element
     )
 }
-p1 <- plot_scalable_radius(kval = 32)
-p2 <- plot_scalable_radius(kval = 100, ytitle=FALSE)
-legend = cowplot::get_legend(p1)
-p1 <- p1 + theme(
-  legend.position='none'
-)
-p2 <- p2 + theme(legend.position='none')
-p <- cowplot::plot_grid(
-  cowplot::plot_grid( p1, p2, align="h"),
-  legend, 
-  ncol=1,
-  rel_heights=c(18,1)
-)
-ggsave("figs/scalability-radius.png", dpi=300, width=5, height=6)
+# p1 <- plot_scalable_radius(kval = 32)
+# p2 <- plot_scalable_radius(kval = 100, ytitle=FALSE)
+# legend = cowplot::get_legend(p1)
+# p1 <- p1 + theme(
+#   legend.position='none'
+# )
+# p2 <- p2 + theme(legend.position='none')
+# p <- cowplot::plot_grid(
+#   cowplot::plot_grid( p1, p2, align="h"),
+#   legend, 
+#   ncol=1,
+#   rel_heights=c(18,1)
+# )
+# ggsave("figs/scalability-radius.png", dpi=300, width=5, height=6)
 ```
 
 ```{r scalable-radius}
@@ -754,15 +748,6 @@ load_data(mr=T) |>
   geom_line(data=~filter(., tau %in% taus)) +
   geom_point(data=~filter(., algorithm == 'Bera-et-al-MR')) +
   geom_line(data=~filter(., algorithm == 'Bera-et-al-MR')) +
-  # geom_hline(aes(yintercept=scaled_radius, color=algorithm), data=baseline) +
-  # geom_text_repel(
-  #   aes(label = tau),
-  #   hjust=0,
-  #   nudge_x=.1,
-  #   show.legend=FALSE,
-  #   direction="y",
-  #   data = ~filter(., parallelism == 16, algorithm == "coreset-MR", tau %in% taus)
-  # ) +
   facet_wrap(vars(dataset), scales='free_y') +
   scale_algorithm() +
   theme_paper()
@@ -796,26 +781,71 @@ ggsave("figs/scalability.png", dpi=300, width=4, height=2)
 ## Streaming
 
 
-```{r}
-kfc <- load_data() |>
-  filter(algorithm == 'KFC', k == 32)
+```{r streaming-mem-radius-tradeoff}
+baseline <- load_data() |>
+  filter(k == 32, algorithm %in% c("KFC", "coreset")) |>
+  filter(dataset %in% c("hmda", "census1990", "athlete")) |>
+  group_by(dataset) |>
+  slice_min(radius)
 
-load_data(streaming = TRUE) |>
+load_data(streaming = TRUE, do_summarise=FALSE) |>
   drop_na(streaming_memory_bytes) |>
   filter(k == 32) |>
   mutate(
     param = if_else(is.na(tau), epsilon, tau),
     bytes_per_point = streaming_memory_bytes / n
   ) |>
+  group_by(algorithm, dataset, k, param) |>
+  reframe(
+    radius, 
+    scaled_radius, 
+    streaming_memory_bytes = mean(streaming_memory_bytes)
+  ) |>
   arrange(param) |>
   print() |>
-  ggplot(aes(bytes_per_point, radius, color=algorithm)) +
-  geom_path() +
-  geom_point() +
-  # geom_hline(aes(yintercept=scaled_radius, color=algorithm), data=kfc) +
+  ggplot(aes(streaming_memory_bytes, scaled_radius, color=algorithm)) +
+  # geom_point() +
+  geom_path(stat='summary') +
+  geom_pointrange(stat='summary') +
+  geom_hline(aes(yintercept=scaled_radius), linetype="dashed", data=baseline) +
+  geom_hline(yintercept=1) +
   scale_algorithm() +
+  labs(x = "memory (bytes)", y = "scaled radius") +
   scale_x_log10(labels=scales::number_bytes) +
-  facet_wrap(vars(dataset), scale='free')
+  facet_wrap(vars(dataset), scale='free_x')
+ggsave("figs/streaming-mem-radius.png", dpi=300, width=6, height=3)
+```
+
+```{r streaming-mem-time-tradeoff}
+baseline <- load_data() |>
+  filter(k == 32, algorithm %in% c("coreset")) |>
+  filter(dataset %in% c("hmda", "census1990", "athlete")) |>
+  group_by(dataset) |>
+  slice_min(radius)
+
+load_data(streaming = TRUE, do_summarise=FALSE) |>
+  drop_na(streaming_memory_bytes) |>
+  filter(k == 32) |>
+  mutate(
+    param = if_else(is.na(tau), epsilon, tau)
+  ) |>
+  group_by(algorithm, dataset, k, param) |>
+  reframe(
+    time_s,
+    streaming_memory_bytes = mean(streaming_memory_bytes)
+  ) |>
+  arrange(param) |>
+  print() |>
+  ggplot(aes(streaming_memory_bytes, time_s, color=algorithm)) +
+  # geom_point() +
+  geom_path(stat='summary') +
+  geom_pointrange(stat='summary') +
+  geom_hline(aes(yintercept=time_s), linetype="dashed", data=baseline) +
+  scale_algorithm() +
+  labs(x = "memory (bytes)", y = "time (seconds)") +
+  scale_x_log10(labels=scales::number_bytes) +
+  facet_wrap(vars(dataset), scale='free_x')
+ggsave("figs/streaming-mem-time.png", dpi=300, width=6, height=3)
 ```
 
 

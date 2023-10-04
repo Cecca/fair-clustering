@@ -174,8 +174,8 @@ def save_timeout(dataset, algorithm, k, delta, attrs_dict, timeout_s):
         })
 
 
-def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_dict, time_s, additional_metrics):
-    data, colors, fairness_constraints = datasets.load(dataset, 0, delta)
+def save_result(opath, centers, assignment, dataset, algorithm, k, delta, attrs_dict, time_s, additional_metrics, shuffle_seed=None):
+    data, colors, fairness_constraints = datasets.load(dataset, 0, delta, shuffle_seed=shuffle_seed)
     radius = assess.radius(data, centers, assignment)
     violation = assess.additive_violations(
         k, colors, assignment, fairness_constraints)
