@@ -102,22 +102,26 @@ if __name__ == "__main__":
 
     k = 32
     delta = 0.01
-    dataset = "census1990"
-    data, colors, fairness_constraints = datasets.load(
-        dataset, 0, delta)
+    dataset = "athlete"
 
     tau = int(k*32)
     logging.info("Tau is %d", tau)
     df = []
-    for parallelism in [2,4,8,16]:
-        algo = MRCoresetFairKCenter(k, tau, parallelism, cplex_path)
+    for parallelism in [16]:
+        for dataset in ["athlete", "census1990"]:
+            data, colors, fairness_constraints = datasets.load(
+                dataset, 0, delta)
+            algo = MRCoresetFairKCenter(k, tau, parallelism, cplex_path)
 
-        assignment = algo.fit_predict(data, colors, fairness_constraints)
-        df.append({
-            "parallelism": parallelism,
-            "time": algo.time(),
-            "coreset_time": algo.additional_metrics()["time_coreset_s"],
-            "radius": assess.radius(data, algo.centers, assignment)
-        })
+            assignment = algo.fit_predict(data, colors, fairness_constraints)
+            df.append({
+                "dataset": dataset,
+                "parallelism": parallelism,
+                "time": algo.time(),
+                "coreset_time": algo.additional_metrics()["time_coreset_s"],
+                "assignment_time": algo.additional_metrics()["time_assignment_s"],
+                "coreset_size": algo.additional_metrics()["coreset_size"],
+                "radius": assess.radius(data, algo.centers, assignment)
+            })
     df = pd.DataFrame(df)
     print(df)
