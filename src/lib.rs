@@ -416,49 +416,64 @@ impl Coreset {
             ndarray::concatenate(Axis(0), &[a.view(), b.view()]).unwrap()
         }
 
+        let t = Instant::now();
         let chunk_size = ((data.nrows() as f64) / (processors as f64)).ceil() as usize;
         let (center_ids, center_points): (Array1<usize>, Array2<f64>) = data
             .axis_chunks_iter(Axis(0), chunk_size)
             .into_par_iter()
             .enumerate()
             .map(|(chunk_idx, chunk)| {
+                let tt = Instant::now();
                 let off = chunk_size * chunk_idx;
                 let (center_ids, _) = greedy_minimum_maximum(&chunk.view(), tau);
                 let center_points = chunk.select(Axis(0), &center_ids.view().to_slice().unwrap());
                 let center_ids = center_ids + off;
+                eprintln!("Map: {:?}", tt.elapsed());
                 (center_ids, center_points)
             })
             .reduce_with(|(ids1, points1), (ids2, points2)| {
-                (cat_rows(ids1, ids2), cat_rows(points1, points2))
+                let tt = Instant::now();
+                let res = (cat_rows(ids1, ids2), cat_rows(points1, points2));
+                eprintln!("Reduce: {:?}", tt.elapsed());
+                res
             })
             .unwrap();
         assert_eq!(data.ncols(), center_points.ncols());
+        eprintln!("Phase 1: {:?}", t.elapsed());
 
+        let t = Instant::now();
         // build the "coreset of the coreset"
         let (selected_ids, _) = greedy_minimum_maximum(&center_points.view(), tau);
         let point_ids = center_ids.select(Axis(0), selected_ids.view().to_slice().unwrap());
         let points = center_points.select(Axis(0), selected_ids.view().to_slice().unwrap());
         let points_sq_norms = compute_sq_norms(&points.view());
+        eprintln!("Phase 2: {:?}", t.elapsed());
 
+        let t = Instant::now();
         // now build, in parallel, the proxy and weight functions
         let (proxy, weights): (Array1<usize>, Array2<u64>) = data
             .axis_chunks_iter(Axis(0), chunk_size)
             .into_par_iter()
             .zip(colors.axis_chunks_iter(Axis(0), chunk_size))
             .map(|(chunk, chunk_colors)| {
+                let tt = Instant::now();
                 let sq_norms = compute_sq_norms(&chunk);
+                eprintln!("sq_norms {:?}", tt.elapsed());
                 let mut proxy = Array1::<usize>::zeros(chunk.nrows());
                 let mut weights = Array2::<u64>::zeros((point_ids.len(), ncolors as usize));
+                let tt = Instant::now();
                 for i in 0..chunk.nrows() {
                     let (_, p) =
                         closest_all(&points.view(), &points_sq_norms, &chunk.row(i), sq_norms[i]);
                     proxy[i] = p;
                     weights[(p, chunk_colors[i] as usize)] += 1;
                 }
+                eprintln!("closest {:?}", tt.elapsed());
                 (proxy, weights)
             })
             .reduce_with(|(p1, w1), (p2, w2)| (cat_rows(p1, p2), w1 + w2))
             .unwrap();
+        eprintln!("Phase 3: {:?}", t.elapsed());
 
         Self {
             point_ids,

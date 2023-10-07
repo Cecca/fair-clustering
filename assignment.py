@@ -112,6 +112,7 @@ def inner_weighted_fair_assignment(R, costs, weights, fairness_constraints, solv
             )
     t_setup_end = time.time()
     logging.info("  Setup LP in %f s", t_setup_end - t_setup_start)
+    logging.info("There are %d constraints in the problem", len(prob.constraints))
 
     t_solve_start = time.time()
     # prob.solve(COIN_CMD(mip=integer, msg=False))

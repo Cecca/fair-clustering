@@ -128,12 +128,43 @@ def census1990():
     colors = ["dAge", 'iSex']
 
     data = df.select(attributes).to_numpy()
-    # data = StandardScaler().fit_transform(data)
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
         pl.col("iSex").map(
             lambda c: encoders["iSex"].fit_transform(c)).explode(),
+        pl.col("dAge").map(
+            lambda c: encoders["dAge"].fit_transform(c)).explode()
+    ).to_numpy()
+    write_hdf5(data, colors, encoders, ofname)
+    return ofname
+
+
+def census1990_age():
+    ofname = "data/census1990-age.hdf5"
+    if os.path.isfile(ofname):
+        return ofname
+
+    url = "https://web.archive.org/web/20170711094723/https://archive.ics.uci.edu/ml/machine-learning-databases/census1990-mld/USCensus1990.data.txt"
+    fname = download(url, "data/census1990.txt")
+    df = pl.read_csv(fname).drop_nulls()
+    attributes = ["dAncstry1", "dAncstry2", "iAvail", "iCitizen", "iClass", "dDepart",
+                  "iDisabl1", "iDisabl2", "iEnglish", "iFeb55", "iFertil", "dHispanic",
+                  "dHour89", "dHours", "iImmigr", "dIncome1", "dIncome2", "dIncome3",
+                  "dIncome4", "dIncome5", "dIncome6", "dIncome7", "dIncome8", "dIndustry",
+                  "iKorean", "iLang1", "iLooking", "iMarital", "iMay75880", "iMeans",
+                  "iMilitary", "iMobility", "iMobillim", "dOccup", "iOthrserv", "iPerscare",
+                  "dPOB", "dPoverty", "dPwgt1", "iRagechld", "dRearning", "iRelat1", "iRelat2",
+                  "iRemplpar", "iRiders", "iRlabor", "iRownchld", "dRpincome", "iRPOB",
+                  "iRrelchld", "iRspouse", "iRvetserv", "iSchool", "iSept80",
+                  "iSubfam1", "iSubfam2", "iTmpabsnt", "dTravtime", "iVietnam", "dWeek89",
+                  "iWork89", "iWorklwk", "iWWII", "iYearsch", "iYearwrk", "dYrsserv"]
+    colors = ["dAge", 'iSex']
+
+    data = df.select(attributes).to_numpy()
+
+    encoders = dict((c, LabelEncoder()) for c in colors)
+    colors = df.select(
         pl.col("dAge").map(
             lambda c: encoders["dAge"].fit_transform(c)).explode()
     ).to_numpy()
@@ -367,6 +398,7 @@ DATASETS = {
     "athlete": athlete,
     "diabetes": diabetes,
     "census1990": census1990,
+    "census1990_age": census1990_age,
     "creditcard": creditcard,
     "4area": four_area,
     "reuter_50_50": c50,

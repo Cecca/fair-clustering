@@ -15,14 +15,15 @@ making the budget of clusters underutilized.
 library(tidyverse)
 library(ggrepel)
 library(kableExtra)
-theme_set(theme_bw() + theme(legend.position="bottom"))
+theme_set(theme_bw() + theme(legend.position="top"))
 
 theme_paper <- function() {
   theme_bw() +
     theme(
-      legend.position = "bottom",
+      legend.position = "top",
       strip.background = element_blank(),
-      strip.text = element_text(hjust=0)
+      strip.text = element_text(hjust=0),
+      plot.margin = margin(0,0,0,0)
     )
 }
 
@@ -99,7 +100,8 @@ load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE, do_summar
        json_extract(params, '$.epsilon') as epsilon,
        {additional_col}
        cast(additional_metrics -> '$.coreset_radius' as real) as coreset_radius,
-       cast(additional_metrics -> '$.time_coreset_s' as real) as coreset_time_s
+       cast(additional_metrics -> '$.time_coreset_s' as real) as coreset_time_s,
+       cast(additional_metrics -> '$.time_assignment_s' as real) as time_assignment_s
        from results
        where dataset not like '%std'
        and {algofilter}")
@@ -153,7 +155,7 @@ load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE, do_summar
       group_by(dataset, algorithm, k, delta, tau, epsilon, parallelism, timed_out, coreset_size_frac, n, dimensions) |>
       summarise(
         across(c(radius, scaled_radius, coreset_radius, 
-                  time_s, coreset_time_s, streaming_memory_bytes
+                  time_s, coreset_time_s, time_assignment_s, streaming_memory_bytes
               ), mean),
         additive_violation = max(additive_violation)
       ) |>
@@ -535,13 +537,14 @@ p_radius <- load_data() |>
   filter(k >= 4) |>
   filter(( tau == 32 ) | is.na(tau)) |>
   filter(dataset %in% selected_datasets) |>
-  compact_plot(k, radius, ylab="radius", xlab="k", ylog=F)
+  compact_plot(k, radius, ylab="radius", xlab="", ylog=F)
 # ggsave("figs/radius-selected.pdf", width=6, height=2.5)
 p_time <- load_data() |>
   filter(k >= 4) |>
   filter(( tau == 32 ) | is.na(tau)) |>
   filter(dataset %in% selected_datasets) |>
-  compact_plot(k, time_s, ylab="time (s)", xlab="k", ylog=T, flabels=scales::label_number(), scales_val="fixed")
+  compact_plot(k, time_s, ylab="time (s)", xlab="k", ylog=T, 
+    flabels=scales::label_number(), scales_val="fixed")
 # ggsave("figs/time-selected.pdf", width=6, height=2.5)
 legend <- cowplot::get_legend(p_radius)
 p_radius <- p_radius + theme(
@@ -550,10 +553,14 @@ p_radius <- p_radius + theme(
 p_time <- p_time + theme(legend.position='none')
 p <- cowplot::plot_grid(
   legend,
-  p_radius,
-  p_time,
+  cowplot::plot_grid(
+    p_radius,
+    p_time,
+    align="v",
+    ncol=1
+  ),
   ncol=1,
-  rel_heights=c(1,14,14)
+  rel_heights=c(1,28)
 )
 ggsave("figs/selected-performance.pdf", width=6, height=4)
 ```
@@ -605,6 +612,16 @@ load_data() |>
   arrange(desc(ratio)) |>
   kbl() |>
   kable_styling()
+```
+
+```{r tab-largest-ratio-2}
+load_data() |>
+  filter(( tau == 32 ) | is.na(tau)) |>
+  select(dataset, k, algorithm, radius) |>
+  filter(algorithm %in% c("KFC", "coreset")) |>
+  pivot_wider(names_from="algorithm", values_from="radius") |>
+  mutate(ratio = coreset / KFC) |>
+  arrange(desc(ratio))
 ```
 
 ```{r}
@@ -874,7 +891,7 @@ load_data(mr=T, do_summarise=F) |>
   facet_wrap(vars(dataset), scales='free_y') +
   scale_algorithm() +
   theme_paper()
-ggsave("figs/mapreduce-radius.png", dpi=300, width=6, height=3)
+ggsave("figs/mapreduce-radius.png", dpi=300, width=6, height=2)
 ```
 
 ```{r scalable-radius}
@@ -887,7 +904,7 @@ print(baseline)
 
 load_data(mr=T, do_summarise=F) |>
   filter(k==32) |>
-  filter(parallelism %in% c(2,4,8,16)) |>
+  filter(parallelism %in% c(2)) |>
   ggplot(aes(parallelism, scaled_radius, group=tau, color=algorithm)) +
   geom_point() +
   geom_line(stat="summary") +
@@ -899,55 +916,79 @@ ggsave("figs/scalability-radius.png", dpi=300, width=6, height=3)
 ```
 
 ```{r scalable-time}
-load_data(mr=T) |>
+p <- load_data(mr=T) |>
   filter(k==32) |>
   filter(parallelism %in% c(2,4,8,16)) |>
+  filter(tau %in% c(1,2)) |>
+  select(dataset, algorithm, parallelism, time_s, time_assignment_s, tau) |>
+  print() |>
   ggplot(aes(parallelism, time_s, group=tau, color=algorithm, shape=algorithm)) +
+  geom_area(aes(y=time_assignment_s, fill=algorithm), color=NA, alpha=0.5, position="identity") +
   geom_point() +
   geom_line() +
-  facet_wrap(vars(dataset), scales='free_y') +
+  facet_wrap(vars(dataset), scales='free_y', ncol=4) +
   scale_algorithm() +
-  theme_paper()
-ggsave("figs/scalability.png", dpi=300, width=6, height=3)
+  scale_y_continuous(limits=c(0,NA)) +
+  theme_paper() +
+  theme(
+    plot.margin = margin(0,4,0,0),
+    legend.margin = margin(0,0,0,0)
+  )
+ggsave("figs/scalability.pdf", dpi=300, width=6, height=2)
 ```
 
 ## Streaming
 
+```{r streaming-mem-radius-paper}
+streaming_compact_plot <- function(data, column, scale_val='free', include_baseline=TRUE) {
+  baseline <- load_data() |>
+    filter(algorithm %in% c("KFC", "coreset")) |>
+    semi_join(select(data, dataset, k)) |>
+    group_by(dataset) |>
+    slice_min(radius)
 
-```{r streaming-mem-radius-tradeoff}
-baseline <- load_data() |>
-  filter(k == 32, algorithm %in% c("KFC", "coreset")) |>
-  filter(dataset %in% c("hmda", "census1990", "athlete")) |>
-  group_by(dataset) |>
-  slice_min(radius)
+  p <- data |>
+    drop_na(streaming_memory_bytes) |>
+    mutate(
+      param = if_else(is.na(tau), epsilon, tau),
+      bytes_per_point = streaming_memory_bytes / n
+    ) |>
+    group_by(algorithm, dataset, k, param) |>
+    reframe(
+      {{column}},
+      streaming_memory_bytes = mean(streaming_memory_bytes)
+    ) |>
+    arrange(param) |>
+    print() |>
+    ggplot(aes(streaming_memory_bytes, {{column}}, color=algorithm, shape=algorithm)) +
+    # geom_point() +
+    geom_path(stat='summary') +
+    geom_point(stat='summary') +
+    # geom_hline(yintercept=1) +
+    scale_algorithm() +
+    labs(x = "memory (bytes)", y = "scaled radius") +
+    scale_x_continuous(trans="identity", labels=scales::number_bytes, 
+      guide = guide_axis(n.dodge=1),
+      n.breaks=4
+    ) +
+    facet_wrap(vars(dataset), scale=scale_val, ncol=4) +
+    theme_paper() +
+    theme(
+      legend.position="top",
+      plot.margin = margin(0,10,0,0)
+    )
 
-load_data(streaming = TRUE, do_summarise=FALSE) |>
-  drop_na(streaming_memory_bytes) |>
+  if (include_baseline) {
+    p <- p + geom_hline(aes(yintercept={{column}}), linetype="dashed", data=baseline)
+  }
+  p
+}
+p <- load_data(streaming=TRUE, do_summarise=TRUE) |>
   filter(k == 32) |>
-  mutate(
-    param = if_else(is.na(tau), epsilon, tau),
-    bytes_per_point = streaming_memory_bytes / n
-  ) |>
-  group_by(algorithm, dataset, k, param) |>
-  reframe(
-    radius,
-    scaled_radius,
-    streaming_memory_bytes = mean(streaming_memory_bytes)
-  ) |>
-  arrange(param) |>
-  print() |>
-  ggplot(aes(streaming_memory_bytes, scaled_radius, color=algorithm, shape=algorithm)) +
-  # geom_point() +
-  geom_path(stat='summary') +
-  geom_point(stat='summary') +
-  geom_hline(aes(yintercept=scaled_radius), linetype="dashed", data=baseline) +
-  # geom_hline(yintercept=1) +
-  scale_algorithm() +
-  labs(x = "memory (bytes)", y = "scaled radius") +
-  scale_x_log10(labels=scales::number_bytes) +
-  facet_wrap(vars(dataset), scale='free')
-ggsave("figs/streaming-mem-radius.png", dpi=300, width=6, height=3)
+  streaming_compact_plot(radius, include_baseline=T, scale_val="free")
+ggsave("figs/streaming-mem-radius.pdf", width=6, height=2.5)
 ```
+
 
 ```{r streaming-mem-time-tradeoff}
 baseline <- load_data() |>
