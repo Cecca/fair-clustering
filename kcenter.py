@@ -326,7 +326,7 @@ if __name__ == "__main__":
 
     k = 32
     delta = 0.01
-    dataset = "athlete"
+    dataset = "census1990"
     data, colors, fairness_constraints = datasets.load(
         dataset, 0, delta)
     n, dims = datasets.dataset_size(dataset)
@@ -335,9 +335,9 @@ if __name__ == "__main__":
     # Fair
     tau = int(k*32)
     logging.info("Tau is %d", tau)
-    algo = Dummy(k)
-    # algo = CoresetFairKCenter(
-    #     k, tau, cplex_path, seed=1, subroutine_name="freq_distributor")
+    # algo = Dummy(k)
+    algo = CoresetFairKCenter(
+        k, tau, cplex_path, seed=1, subroutine_name="freq_distributor")
     # algo = KFC(k, cplex_path, seed=2)
     # algo = BeraEtAlKCenter(k, cplex_path, seed=2)
     print(f"{algo.name()} ==============")
@@ -345,10 +345,11 @@ if __name__ == "__main__":
     centers = algo.centers
     print("radius", assess.radius(data, centers, assignment))
     print("cluster sizes", assess.cluster_sizes(centers, assignment))
+    print("cluster radii", assess.radius(data, centers, assignment, True))
     print("violation", assess.additive_violations(
         k, colors, assignment, fairness_constraints))
     print(algo.attrs())
     print(algo.additional_metrics())
     print("time", algo.time())
-    viz.plot_clustering(data, centers, assignment,
-                        filename=f"{algo.name()}.png")
+    # viz.plot_clustering(data, centers, assignment,
+    #                     filename=f"{algo.name()}.png")
