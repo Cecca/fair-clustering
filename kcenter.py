@@ -99,8 +99,9 @@ class Dummy(object):
             slice_size = (color_points.shape[0] + 1) // self.k
             for c in range(self.k):
                 slice = color_points[c*slice_size: (c+1)*slice_size]
-                assert slice.shape[0] > 0, f"cluster {c} slice size: {slice_size} n={n}, ncolors={ncolors} colorpoints: {color_points.shape[0]}"
-                clusters[c].extend(slice)
+                #assert slice.shape[0] > 0, f"cluster {c} slice size: {slice_size} n={n}, ncolors={ncolors} colorpoints: {color_points.shape[0]}"
+                if slice.shape[0] > 0:
+                    clusters[c].extend(slice)
 
         # Find the center
         logging.info("finding the centers")
@@ -243,7 +244,7 @@ class CoresetFairKCenter(object):
         self.data = X
         start = time.time()
         coreset_ids, coreset, proxy, weights = build_coreset(
-            X, tau, colors)
+            X, self.tau, colors)
         self.coreset_points_ids = coreset_ids
         self.proxy = proxy
 

@@ -66,21 +66,23 @@ def delta_influence():
 
 def exhaustive():
     ofile = "results.hdf5"
-    ks = [32]
+    ks = [32, 64]
     # ks = [2, 4, 8, 16, 32]
     deltas = [0.01]
     all_datasets = datasets.datasets()
+    all_datasets = ["athlete", "diabetes"]
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
         algos = [
-            # kcenter.Dummy(k),
-            # kcenter.UnfairKCenter(k),
-            # kcenter.BeraEtAlKCenter(k, cplex_path),
-            # KFC(k, cplex_path)
+            kcenter.Dummy(k),
+            kcenter.UnfairKCenter(k),
+            kcenter.BeraEtAlKCenter(k, cplex_path),
+            KFC(k, cplex_path)
         ] + [
             kcenter.CoresetFairKCenter(
                 k, tau, cplex_path, seed=seed)
-            for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k]
+            #for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k]
+            for tau in [32*k]
             for seed in [1,2,3,4,5,6,7]
             if tau <= n
         ]
@@ -90,20 +92,20 @@ def exhaustive():
 
 def mr_experiments():
     ofile = "results.hdf5"
-    ks = [32, 100]
+    ks = [32]
     deltas = [0.01]
-    all_datasets = ["census1990", "hmda", "athlete"]
+    all_datasets = ["diabetes", "athlete", "census1990", "hmda"]
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
         for threads in [2, 4, 8, 16]:
-            for shuffle_seed in [11234,1234,4234,1234,432]:
+            for shuffle_seed in [11234,1234,4234,1234,432]:#,1,2,3,4,5]:
                 algos = [
                     mapreduce.BeraEtAlMRFairKCenter(
                         k, threads, cplex_path, seed=shuffle_seed)
                 ] + [
                     mapreduce.MRCoresetFairKCenter(
                         k, tau, threads, cplex_path, seed=shuffle_seed)
-                    for tau in [(16*k)//threads, 2*k, 4*k, 8*k]
+                    for tau in [2*k, 4*k, 8*k, 16*k]
                     if tau <= n
                 ]
                 for algo in algos:
@@ -114,21 +116,20 @@ def streaming_experiments():
     ofile = "results.hdf5"
     ks = [32]
     deltas = [0.01]
-    all_datasets = ["athlete", "census1990", "hmda"]
+    all_datasets = ["diabetes", "athlete", "census1990", "hmda"]
     #all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
-        for shuffle_seed in [1,2,3,4,5]:
+        for shuffle_seed in [1,2,3,4,5,6,7,8,9,10,11,12]:
             n, dim = datasets.dataset_size(dataset)
             algos = [
                 streaming.BeraEtAlStreamingFairKCenter(
-                    k, epsilon, cplex_path, seed=seed)
-                for seed in [shuffle_seed]
+                    k, epsilon, cplex_path, seed=shuffle_seed)
                 for epsilon in [0.5, 0.1, 0.05, 0.01]
             ] + [
                 streaming.StreamingCoresetFairKCenter(
-                    k, k*tau, cplex_path, seed=seed)
-                for tau in [8, 32, 128, 512]
-                for seed in [shuffle_seed]
+                    k, k*tau, cplex_path, seed=shuffle_seed)
+                for tau in [128, 256, 512]
+                #for tau in [2, 4, 8, 32, 128, 512]
                 if tau <= n
             ]
             for algo in algos:
@@ -146,6 +147,6 @@ if __name__ == "__main__":
 
     #exhaustive()
     #delta_influence()
-    # mr_experiments()
+    #mr_experiments()
     streaming_experiments()
 
