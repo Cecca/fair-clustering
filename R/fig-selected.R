@@ -1,0 +1,52 @@
+compact_plot <- function(data, xaes, yaes, xlab, ylab, ylog=FALSE, flabels=scales::label_number_si(), scales_val="free_y") {
+  if (ylog) {
+    tfun <- "log10"
+  } else {
+    tfun <- "identity"
+  }
+  data |>
+    ggplot(aes({{xaes}}, {{yaes}}, color=algorithm, shape=algorithm, linetype=algorithm)) +
+    geom_point() +
+    geom_line() +
+    scale_algorithm() +
+    facet_wrap(vars(dataset), scale=scales_val, ncol=4) +
+    scale_y_continuous(labels=flabels, trans=tfun) +
+    scale_x_continuous(trans="log2") +
+    labs(
+      x = xlab,
+      y = ylab
+    ) +
+    theme_paper() +
+    theme(legend.position="top")
+}
+
+two_row_plot <- function(data) {
+  data |>
+    filter(algorithm == "Bera-et-al") |>
+    print()
+  p_radius <- data |>
+    compact_plot(k, radius, ylab="radius", xlab="", ylog=F)
+  p_time <- data |>
+    compact_plot(k, time_s, ylab="time (s)", xlab="k", ylog=T, 
+      flabels=scales::label_number(), scales_val="fixed")
+  legend <- cowplot::get_legend(p_radius)
+  p_radius <- p_radius + theme(
+    legend.position='none'
+  )
+  p_time <- p_time + theme(legend.position='none')
+  p <- cowplot::plot_grid(
+    legend,
+    cowplot::plot_grid(
+      p_radius,
+      p_time,
+      align="v",
+      ncol=1
+    ),
+    ncol=1,
+    rel_heights=c(1,10)
+  )
+}
+# ggsave("figs/selected-performance.pdf", width=6, height=4)
+
+
+

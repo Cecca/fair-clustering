@@ -1,0 +1,60 @@
+plot_streaming <- function(data, baseline_data) {
+  baseline <- baseline_data |>
+    filter(algorithm %in% c("KFC", "coreset")) |>
+    semi_join(select(data, dataset, k)) |>
+    group_by(dataset) |>
+    slice_min(radius)
+
+  do_plot <- function(data, column, ylab, scale_val='free', include_baseline=TRUE, labelsfun=scales::label_number_auto()) {
+    p <- data |>
+      drop_na(streaming_memory_bytes) |>
+      mutate(
+        param = if_else(is.na(tau), epsilon, tau),
+        bytes_per_point = streaming_memory_bytes / n
+      ) |>
+      group_by(algorithm, dataset, k, param) |>
+      reframe(
+        {{column}},
+        streaming_memory_bytes = mean(streaming_memory_bytes)
+      ) |>
+      arrange(param) |>
+      print() |>
+      ggplot(aes(streaming_memory_bytes, {{column}}, color=algorithm, shape=algorithm)) +
+      # geom_point() +
+      geom_path(stat='summary') +
+      geom_point(stat='summary') +
+      # geom_hline(yintercept=1) +
+      scale_algorithm() +
+      labs(x = "memory (bytes)", y = ylab) +
+      scale_y_continuous(trans="identity", labels=labelsfun) +
+      scale_x_continuous(trans="identity", labels=scales::number_bytes, 
+        guide = guide_axis(n.dodge=1),
+        n.breaks=4
+      ) +
+      facet_wrap(vars(dataset), scale=scale_val, ncol=4) +
+      theme_paper() +
+      theme(
+        legend.position="top",
+        plot.margin = margin(0,10,0,0)
+      )
+
+    if (include_baseline) {
+      p <- p + geom_hline(aes(yintercept={{column}}), linetype="dashed", data=baseline)
+    }
+    p
+  }
+
+  p_radius <- do_plot(data, radius, ylab="radius", labelsfun=scales::label_number_si())
+  p_time <- do_plot(data, time_s, ylab="time (s)")
+  legend <- get_legend(p_radius)
+  p_radius <- p_radius + theme(legend.position = 'none')
+  p_time <- p_time + theme(legend.position = 'none')
+
+  plot_grid(
+    legend,
+    plot_grid(p_time, p_radius),
+    ncol=1,
+    rel_heights=c(1,10)
+  )
+}
+

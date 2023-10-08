@@ -17,3 +17,6 @@ console:
 build-analysis-container:
   apptainer build --force analysis.sif analysis.def
 
+figures:
+  R -e 'targets::tar_make()'
+

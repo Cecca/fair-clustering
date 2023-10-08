@@ -53,19 +53,6 @@ scale_algorithm <- function() {
     ))
   )
 }
-# scale_shape_algorithm <- function() {
-#   scale_color_manual(values = c(
-#     "coreset" = 21,
-#     "coreset-MR" = 21,
-#     "coreset-stream" = 21,
-#     "KFC" = 22,
-#     "unfair" = 23,
-#     "Bera-et-al" = 24,
-#     "Bera-et-al-MR" = 24,
-#     "Bera-et-al-stream" = 24,
-#     "dummy" = 25
-#   ))
-# }
 
 imgdir <- "imgs"
 
@@ -104,6 +91,7 @@ load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE, do_summar
        cast(additional_metrics -> '$.time_assignment_s' as real) as time_assignment_s
        from results
        where dataset not like '%std'
+       and dataset not like 'census1990'
        and {algofilter}")
 
   smallest_radius <- tbl(con, sql("select dataset, k, min(radius) as best_unfair_radius from results group by dataset, k")) |> collect()
@@ -116,6 +104,7 @@ load_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE, do_summar
       scaled_radius = radius / best_unfair_radius,
       dataset = case_when(
         dataset == "reuter_50_50" ~ "reuter",
+        dataset == "census1990_age" ~ "census1990",
         T ~ dataset
       ),
       algorithm = case_when(
@@ -916,24 +905,34 @@ ggsave("figs/scalability-radius.png", dpi=300, width=6, height=3)
 ```
 
 ```{r scalable-time}
+mr_plot <- function(data, column, column2, ylab) {
+  p <- data |>
+    filter(dataset %in% c("hmda", "census1990")) |>
+    filter(k==32) |>
+    filter(parallelism %in% c(2,4,8,16)) |>
+    filter(tau %in% c(1,2)) |>
+    select(dataset, algorithm, parallelism, time_s, time_assignment_s, tau, radius) |>
+    print() |>
+    ggplot(aes(parallelism, time_s, group=tau, color=algorithm, shape=algorithm))
+    geom_area(aes(y=time_assignment_s, fill=algorithm), color=NA, alpha=0.5, position="identity") +
+    geom_point() +
+    geom_line() +
+    facet_wrap(vars(dataset), scales='free_y', ncol=4) +
+    scale_algorithm() +
+    scale_y_continuous(limits=c(0,NA)) +
+    scale_x_continuous(trans="log2") +
+    labs(
+      x = "parallelism",
+      y = ylab
+    ) +
+    theme_paper() +
+    theme(
+      plot.margin = margin(0,4,0,0),
+      legend.margin = margin(0,0,0,0)
+    )
+}
 p <- load_data(mr=T) |>
-  filter(k==32) |>
-  filter(parallelism %in% c(2,4,8,16)) |>
-  filter(tau %in% c(1,2)) |>
-  select(dataset, algorithm, parallelism, time_s, time_assignment_s, tau) |>
-  print() |>
-  ggplot(aes(parallelism, time_s, group=tau, color=algorithm, shape=algorithm)) +
-  geom_area(aes(y=time_assignment_s, fill=algorithm), color=NA, alpha=0.5, position="identity") +
-  geom_point() +
-  geom_line() +
-  facet_wrap(vars(dataset), scales='free_y', ncol=4) +
-  scale_algorithm() +
-  scale_y_continuous(limits=c(0,NA)) +
-  theme_paper() +
-  theme(
-    plot.margin = margin(0,4,0,0),
-    legend.margin = margin(0,0,0,0)
-  )
+  mr_plot(time_s, column2=time_assignment_s, ylab="time (s)")
 ggsave("figs/scalability.pdf", dpi=300, width=6, height=2)
 ```
 
