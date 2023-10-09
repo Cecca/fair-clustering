@@ -3,8 +3,8 @@ theme_paper <- function() {
     theme(
       legend.position = "top",
       strip.background = element_blank(),
-      strip.text = element_text(hjust=0),
-      plot.margin = margin(0,0,0,0)
+      strip.text = element_text(hjust = 0),
+      plot.margin = margin(0, 0, 0, 0)
     )
 }
 
@@ -12,8 +12,8 @@ scale_algorithm <- function() {
   list(
     scale_color_manual(values = c(
       "coreset" = "#5778a4",
-      "coreset (1)" = "#5778a4",
-      "coreset (32)" = "#5778a4",
+      "coreset (1k)" = "#5778a4",
+      "coreset (32k)" = "#5778a4",
       "coreset-MR" = "#5778a4",
       "coreset-stream" = "#5778a4",
       "KFC" = "#e49444",
@@ -22,11 +22,11 @@ scale_algorithm <- function() {
       "Bera-et-al-MR" = "#d1615d",
       "Bera-et-al-stream" = "#d1615d",
       "dummy" = "black"
-    ), aesthetics=c("color", "fill")),
+    ), aesthetics = c("color", "fill")),
     scale_shape_manual(values = c(
       "coreset" = 19,
-      "coreset (1)" = 19,
-      "coreset (32)" = 19,
+      "coreset (1k)" = 19,
+      "coreset (32k)" = 19,
       "coreset-MR" = 19,
       "coreset-stream" = 19,
       "KFC" = 17,
@@ -38,8 +38,8 @@ scale_algorithm <- function() {
     )),
     scale_linetype_manual(values = c(
       "coreset" = "solid",
-      "coreset (1)" = "dotted",
-      "coreset (32)" = "solid",
+      "coreset (1k)" = "dotted",
+      "coreset (32k)" = "solid",
       "coreset-MR" = "solid",
       "coreset-stream" = "solid",
       "KFC" = "solid",
@@ -55,7 +55,7 @@ scale_algorithm <- function() {
 imgdir <- "imgs"
 
 imgpath <- function(key) {
-  str_c(imgdir, key, "clustering.png", sep="/")
+  str_c(imgdir, key, "clustering.png", sep = "/")
 }
 
 
@@ -81,7 +81,7 @@ get_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE, do_summari
   }
 
   q <- str_glue(
-      "select *, 
+    "select *,
        json_extract(params, '$.tau') / k as tau,
        json_extract(params, '$.epsilon') as epsilon,
        {additional_col}
@@ -91,11 +91,12 @@ get_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE, do_summari
        from results
        where dataset not like '%std'
        and dataset not like 'census1990'
-       and {algofilter}")
+       and {algofilter}"
+  )
 
   smallest_radius <- tbl(con, sql("select dataset, k, min(radius) as best_unfair_radius from results group by dataset, k")) |> collect()
 
-  results <- tbl(con, sql(q)) |> 
+  results <- tbl(con, sql(q)) |>
     inner_join(tbl(con, "dataset_stats")) |>
     collect() |>
     inner_join(smallest_radius) |>
@@ -117,15 +118,15 @@ get_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE, do_summari
         algorithm == "streaming-coreset-fair-k-center" ~ "coreset-stream",
         T ~ algorithm
       ),
-      algorithm = factor(algorithm, ordered=TRUE, levels=c(
-        "unfair", 
-        "Bera-et-al", 
-        "Bera-et-al-MR", 
-        "Bera-et-al-stream", 
-        "KFC", 
+      algorithm = factor(algorithm, ordered = TRUE, levels = c(
+        "unfair",
+        "Bera-et-al",
+        "Bera-et-al-MR",
+        "Bera-et-al-stream",
+        "KFC",
         "coreset",
-        "coreset-MR", 
-        "coreset-stream", 
+        "coreset-MR",
+        "coreset-stream",
         "dummy"
       )),
       # timeout_s = if_else(time_s > 30*60, 30*60, timeout_s),
@@ -143,9 +144,10 @@ get_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE, do_summari
     results <- results |>
       group_by(dataset, algorithm, k, delta, tau, epsilon, parallelism, timed_out, coreset_size_frac, n, dimensions) |>
       summarise(
-        across(c(radius, scaled_radius, coreset_radius, 
-                  time_s, coreset_time_s, time_assignment_s, streaming_memory_bytes
-              ), mean),
+        across(c(
+          radius, scaled_radius, coreset_radius,
+          time_s, coreset_time_s, time_assignment_s, streaming_memory_bytes
+        ), mean),
         additive_violation = max(additive_violation)
       ) |>
       mutate(streaming_memory_bytes = as.double(streaming_memory_bytes)) |>
@@ -160,5 +162,3 @@ get_data <- function(delta_val = 0.01, mr = FALSE, streaming = FALSE, do_summari
   DBI::dbDisconnect(con)
   results
 }
-
-
