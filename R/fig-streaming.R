@@ -1,9 +1,14 @@
-#' @importFrom rlang .data
-plot_streaming <- function(data, baseline_data) {
-  do_plot <- function(data, column, ylab, scale_val = "free", include_baseline = TRUE, labelsfun = scales::label_number_auto()) {
+plot_streaming <- function(data, baseline_data, psize = 2) {
+  do_plot <- function(data, column, ylab,
+                      scale_val = "free", include_baseline = TRUE,
+                      ytrans = "identity",
+                      labelsfun = scales::label_number_auto()) {
     baseline <- baseline_data |>
       filter(algorithm %in% c("KFC", "coreset")) |>
-      filter(is.na(tau) | (tau == 32)) |>
+      filter(k == 32) |>
+      select(dataset, k, algorithm, radius, time_s, tau) |>
+      print(n = 100) |>
+      filter(is.na(tau) | (tau >= 32)) |>
       semi_join(select(data, dataset, k)) |>
       group_by(dataset) |>
       slice_min({{ column }})
@@ -12,33 +17,48 @@ plot_streaming <- function(data, baseline_data) {
       select(algorithm, dataset, radius, time_s) |>
       print()
 
-    p <- data |>
+    plotdata <- data |>
       drop_na(streaming_memory_bytes) |>
       mutate(
         param = if_else(is.na(tau), epsilon, tau),
         bytes_per_point = streaming_memory_bytes / n
       ) |>
       group_by(algorithm, dataset, k, param) |>
+      filter(radius != min(radius), radius != max(radius)) |>
       reframe(
         {{ column }},
         streaming_memory_bytes = mean(streaming_memory_bytes)
       ) |>
-      arrange(param) |>
+      arrange(param)
+
+    labels <- plotdata |>
+      group_by(dataset, algorithm) |>
+      filter(streaming_memory_bytes == max(streaming_memory_bytes))
+
+    p <- plotdata |>
       ggplot(
         aes(
           streaming_memory_bytes, {{ column }},
           color = algorithm, shape = algorithm
         )
       ) +
-      # geom_point() +
       geom_path(stat = "summary") +
-      geom_point(stat = "summary") +
-      # geom_hline(yintercept=1) +
+      geom_point(stat = "summary", size = psize) +
+      # geom_text(
+      #   aes(
+      #     label = param
+      #   ),
+      #   data = labels,
+      #   size = 2,
+      #   stat = "summary",
+      #   nudge_x = 1,
+      #   ha = 0
+      # ) +
       scale_algorithm() +
       labs(x = "memory (bytes)", y = ylab) +
-      scale_y_continuous(trans = "identity", labels = labelsfun) +
+      scale_y_continuous(trans = ytrans, labels = labelsfun) +
       scale_x_continuous(
-        trans = "identity",
+        trans = "log",
         labels = scales::label_number_si(),
         guide = guide_axis(n.dodge = 1),
         n.breaks = 4
@@ -57,7 +77,11 @@ plot_streaming <- function(data, baseline_data) {
   }
 
   p_radius <- do_plot(data, radius, ylab = "radius", labelsfun = scales::label_number_si())
-  p_time <- do_plot(data, time_s, ylab = "time (s)")
+  p_time <- do_plot(
+    data, time_s,
+    ylab = "time (s)", ytrans = "log",
+    labelsfun = scales::number_format(accuracy = 1)
+  )
   legend <- get_legend(p_radius)
   p_radius <- p_radius + theme(legend.position = "none")
   p_time <- p_time + theme(legend.position = "none")

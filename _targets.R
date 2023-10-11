@@ -6,6 +6,7 @@ source("R/fig-mapreduce.R")
 tar_option_set(packages = c(
   "tidyverse",
   "cowplot",
+  "ggrepel",
   "stringr"
 ))
 
@@ -37,7 +38,10 @@ list(
   }),
 
   # MapReduce
-  tar_target(mr_data, get_data(mr = TRUE) |> filter(dataset %in% large_datasets)),
+  tar_target(
+    mr_data,
+    get_data(mr = TRUE, do_summarise = FALSE) |> filter(dataset %in% large_datasets)
+  ),
   tar_target(mr_figure, {
     plot_mr(mr_data)
     ggsave("figs/mapreduce.pdf", width = 6, height = 2)
@@ -46,7 +50,10 @@ list(
   # Streaming
   tar_target(
     streaming_data,
-    get_data(streaming = TRUE, do_summarise = TRUE) |> filter(k == 32, dataset %in% large_datasets)
+    get_data(streaming = TRUE, do_summarise = FALSE) |>
+      filter(k == 32, dataset %in% large_datasets) |>
+      filter(is.na(tau) | (tau <= 512)) |>
+      filter(is.na(epsilon) | (epsilon >= 0.001))
   ),
   tar_target(streaming_figure, {
     plot_streaming(streaming_data, selected_data)

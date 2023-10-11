@@ -109,35 +109,36 @@ if __name__ == "__main__":
 
     k = 32
     delta = 0.01
-    dataset = "athlete"
+    all_datasets = ["hmda", "census1990_age"]
 
     df = []
-    for shuffle_seed in range(4):
-        data, colors, fairness_constraints = datasets.load(
-            dataset, 0, delta, shuffle_seed=shuffle_seed)
-        for tau in [8, 32, 128, 512, 4096]:
-            algo = StreamingCoresetFairKCenter(k, k*tau, cplex_path, subroutine_name="freq_distributor")
-            assignment = algo.fit_predict(data, colors, fairness_constraints)
-            res = {
-                "algorithm": algo.name(),
-                "param": tau,
-                "time": algo.time(),
-                "radius": assess.radius(data, algo.centers, assignment)
-            }
-            res.update(algo.additional_metrics())
-            df.append(res)
+    for dataset in all_datasets:
+        for shuffle_seed in range(1):
+            data, colors, fairness_constraints = datasets.load(
+                dataset, 0, delta, shuffle_seed=shuffle_seed)
+            for tau in [1]:
+                algo = StreamingCoresetFairKCenter(k, k*tau, cplex_path, subroutine_name="freq_distributor")
+                assignment = algo.fit_predict(data, colors, fairness_constraints)
+                res = {
+                    "algorithm": algo.name(),
+                    "param": tau,
+                    "time": algo.time(),
+                    "radius": assess.radius(data, algo.centers, assignment)
+                }
+                res.update(algo.additional_metrics())
+                df.append(res)
 
-        # for epsilon in [0.5, 0.1, 0.05, 0.01]:
-        #     algo = BeraEtAlStreamingFairKCenter(k, epsilon, cplex_path)
-        #     assignment = algo.fit_predict(data, colors, fairness_constraints)
-        #     res = {
-        #         "algorithm": algo.name(),
-        #         "param": epsilon,
-        #         "time": algo.time(),
-        #         "radius": assess.radius(data, algo.centers, assignment)
-        #     }
-        #     res.update(algo.additional_metrics())
-        #     df.append(res)
+            # for epsilon in [0.5, 0.1, 0.05, 0.01]:
+            #     algo = BeraEtAlStreamingFairKCenter(k, epsilon, cplex_path)
+            #     assignment = algo.fit_predict(data, colors, fairness_constraints)
+            #     res = {
+            #         "algorithm": algo.name(),
+            #         "param": epsilon,
+            #         "time": algo.time(),
+            #         "radius": assess.radius(data, algo.centers, assignment)
+            #     }
+            #     res.update(algo.additional_metrics())
+            #     df.append(res)
 
     df = pd.DataFrame(df)
     print(df)
