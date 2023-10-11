@@ -285,6 +285,10 @@ impl Coreset {
         let start = Instant::now();
         // estimate upper and lower bound of the radius in the dataset
         let (lower, upper) = find_radius_range(data, k);
+        eprintln!(
+            "lower bound {lower}, upper bound {upper}, ratio {}",
+            upper / lower
+        );
         let mut instances = Vec::new();
         let mut guess = lower;
         while guess <= upper {
