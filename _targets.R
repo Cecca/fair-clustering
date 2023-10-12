@@ -79,7 +79,7 @@ list(
         algorithm,
       )) |>
       two_row_plot(ncol = 5)
-    ggsave("figs/all-sequential-performance.pdf", width = 6, height = 8)
+    ggsave("figs/all-sequential-performance.pdf", width = 12, height = 8)
   }),
 
   # Streaming
