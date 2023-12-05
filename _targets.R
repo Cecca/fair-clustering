@@ -7,7 +7,8 @@ tar_option_set(packages = c(
   "tidyverse",
   "cowplot",
   "ggrepel",
-  "stringr"
+  "stringr",
+  "kableExtra"
 ))
 
 selected_datasets <- c("hmda", "census1990", "athlete", "diabetes")
@@ -90,5 +91,40 @@ list(
   tar_target(all_streaming_figure, {
     plot_streaming(streaming_data, selected_data)
     ggsave("figs/all-streaming.pdf", width = 6, height = 2)
-  })
+  }),
+
+  # Additive violation
+  tar_target(
+    table_additive_violation,
+    all_data |>
+      filter(k == 32) |>
+      filter((tau == 32) | is.na(tau)) |>
+      filter(algorithm != "dummy") |>
+      select(dataset, algorithm, additive_violation) |>
+      pivot_wider(names_from = "algorithm", values_from = "additive_violation") |>
+      kbl(format = "markdown")
+  ),
+
+  # Coreset radius ratios
+  tar_target(
+    table_coreset_radius_ratio,
+    all_data |>
+      filter(algorithm == "coreset", tau %in% c(1, 32), k == 32) |>
+      select(dataset, tau, coreset_radius) |>
+      pivot_wider(names_from = "tau", values_from = "coreset_radius") |>
+      mutate(radius_ratio = `1` / `32`) |>
+      rename(`1k` = `1`, `32k` = `32`) |>
+      kbl(format = "markdown", digits = 2)
+  ),
+
+  # Unfair radius
+  tar_target(
+    table_unfair_radius,
+    all_data |>
+      filter(algorithm == "unfair", k %in% c(16, 64)) |>
+      select(dataset, k, radius) |>
+      pivot_wider(names_from = "k", values_from = "radius") |>
+      mutate(radius_ratio = `16` / `64`) |>
+      filter(dataset %in% c("bank", "diabetes"))
+  )
 )
