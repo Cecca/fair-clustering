@@ -102,7 +102,9 @@ list(
       filter(algorithm != "dummy") |>
       select(dataset, algorithm, additive_violation) |>
       pivot_wider(names_from = "algorithm", values_from = "additive_violation") |>
-      kbl(format = "markdown")
+      kbl(format = "latex", booktabs=T) |>
+      str_replace_all("NA", "-") |>
+      write_file("figs/additive_violation.tex")
   ),
 
   # Coreset radius ratios
@@ -114,7 +116,10 @@ list(
       pivot_wider(names_from = "tau", values_from = "coreset_radius") |>
       mutate(radius_ratio = `1` / `32`) |>
       rename(`1k` = `1`, `32k` = `32`) |>
-      kbl(format = "markdown", digits = 2)
+      # kbl(format = "markdown", digits = 2)
+      kbl(format = "latex", booktabs=T, digits=2) |>
+      str_replace_all("NA", "-") |>
+      write_file("figs/coreset_radius_ratio.tex")
   ),
 
   # Unfair radius
