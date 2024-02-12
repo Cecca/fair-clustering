@@ -39,7 +39,7 @@ plot_mr <- function(data, psize = 2) {
     geom_line(stat = "summary") +
     facet_wrap(vars(dataset), scales = "free_y", ncol = 4) +
     scale_algorithm() +
-    scale_y_continuous(labels = scales::label_number_si()) +
+    scale_y_continuous(labels = scales::label_number(scale_cut=scales::cut_short_scale())) +
     scale_x_continuous(trans = "log2") +
     labs(
       x = "parallelism",

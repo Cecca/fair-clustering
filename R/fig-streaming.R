@@ -59,7 +59,7 @@ plot_streaming <- function(data, baseline_data, psize = 2) {
       scale_y_continuous(trans = ytrans, labels = labelsfun) +
       scale_x_continuous(
         trans = "log",
-        labels = scales::label_number_si(),
+        labels = scales::label_number(scale_cut=scales::cut_short_scale()),
         guide = guide_axis(n.dodge = 1),
         n.breaks = 4
       ) +
@@ -76,7 +76,7 @@ plot_streaming <- function(data, baseline_data, psize = 2) {
     p
   }
 
-  p_radius <- do_plot(data, radius, ylab = "radius", labelsfun = scales::label_number_si())
+  p_radius <- do_plot(data, radius, ylab = "radius", labelsfun = scales::label_number(scales_cut=scales::cut_short_scale()))
   p_time <- do_plot(
     data, time_s,
     ylab = "time (s)", ytrans = "log",

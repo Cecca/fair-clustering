@@ -1,4 +1,4 @@
-compact_plot <- function(data, xaes, yaes, xlab, ylab, ylog = FALSE, flabels = scales::label_number_si(), scales_val = "free_y", ncol = 4) {
+compact_plot <- function(data, xaes, yaes, xlab, ylab, ylog = FALSE, flabels = scales::label_number(scale_cut=scales::cut_short_scale()), scales_val = "free_y", ncol = 4) {
   if (ylog) {
     tfun <- "log10"
   } else {
