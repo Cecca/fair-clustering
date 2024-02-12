@@ -1,17 +1,18 @@
 # Fair k-center clustering
 
 This repository contains several implementations of algorithms for fair k-center clustering.
+For the latest version visit [the github repository](https://github.com/Cecca/fair-clustering).
 The algorithms are implemented mostly in Python, with performance-sensitive parts implemented in Rust.
 
 ## Building the software
 
-First, you need to [install Rust](https://rustup.rs/). Then, if you are using `conda`, you can setup the 
-environment using the provided `env.yaml` file:
+First, you need to [install Rust](https://rustup.rs/). 
+Then, you can use [`micromamba`](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html), 
+you can setup the environment using the provided `env.yaml` file:
 
 ```
-conda create -n fair-clustering
-conda activate fair-clustering
-conda install -y -q -n fair-clustering -f /app/env.yaml
+micromamba create -f env.yaml
+micromamba activate fair-clustering
 ```
 
 After that, you can compile the Rust extension used by the software using the following command:
@@ -43,4 +44,15 @@ These data files can be processed using the very convenient [`h5py`](https://www
 ## Running the experiments
 
 The experiments reported in the paper are run using the code in the script [`experiments.py`](https://github.com/Cecca/fair-clustering/blob/main/experiments.py).
+You need a copy of Cplex to run the experiments, so that then you can run
+
+```
+python experiments.py ~/your/path/to/cplex $EXPERIMENT
+```
+
+Where `$EXPERIMENT` is one of
+
+- `exhaustive`
+- `mapreduce`
+- `streaming`
 
