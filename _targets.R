@@ -116,6 +116,7 @@ list(
       pivot_wider(names_from = "tau", values_from = "coreset_radius") |>
       mutate(radius_ratio = `1` / `32`) |>
       rename(`1k` = `1`, `32k` = `32`) |>
+      select(dataset, radius_ratio) |>
       # kbl(format = "markdown", digits = 2)
       kbl(format = "latex", booktabs=T, digits=2) |>
       str_replace_all("NA", "-") |>

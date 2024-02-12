@@ -9,6 +9,10 @@ theme_paper <- function() {
 }
 
 scale_algorithm <- function() {
+  coreset_marker_size <- 1
+  beraetal_marker_size <- 2.5
+  base_marker_size <- 1.5
+  beraetal_marker <- 1
   list(
     scale_color_manual(values = c(
       "coreset" = "#5778a4",
@@ -23,6 +27,19 @@ scale_algorithm <- function() {
       "Bera-et-al-stream" = "#d1615d",
       "dummy" = "black"
     ), aesthetics = c("color", "fill")),
+    scale_size_manual(values = c(
+      "coreset" = coreset_marker_size,
+      "coreset (1k)" = coreset_marker_size,
+      "coreset (32k)" = coreset_marker_size,
+      "coreset-MR" = coreset_marker_size,
+      "coreset-stream" = coreset_marker_size,
+      "KFC" = base_marker_size,
+      "unfair" = base_marker_size,
+      "Bera-et-al" = beraetal_marker_size,
+      "Bera-et-al-MR" =beraetal_marker_size,
+      "Bera-et-al-stream" =beraetal_marker_size,
+      "dummy" = base_marker_size
+    )),
     scale_shape_manual(values = c(
       "coreset" = 19,
       "coreset (1k)" = 19,
@@ -31,9 +48,9 @@ scale_algorithm <- function() {
       "coreset-stream" = 19,
       "KFC" = 17,
       "unfair" = 18,
-      "Bera-et-al" = 15,
-      "Bera-et-al-MR" = 15,
-      "Bera-et-al-stream" = 15,
+      "Bera-et-al" = beraetal_marker,
+      "Bera-et-al-MR" = beraetal_marker,
+      "Bera-et-al-stream" = beraetal_marker,
       "dummy" = 8
     )),
     scale_linetype_manual(values = c(

@@ -5,9 +5,9 @@ compact_plot <- function(data, xaes, yaes, xlab, ylab, ylog = FALSE, flabels = s
     tfun <- "identity"
   }
   data |>
-    ggplot(aes({{ xaes }}, {{ yaes }}, color = algorithm, shape = algorithm, linetype = algorithm)) +
-    geom_point(size = 2) +
-    geom_line() +
+    ggplot(aes({{ xaes }}, {{ yaes }}, color = algorithm, shape = algorithm, linetype = algorithm, size=algorithm)) +
+    geom_point() +
+    geom_line(linewidth=0.5) +
     scale_algorithm() +
     facet_wrap(vars(dataset), scale = scales_val, ncol = ncol) +
     scale_y_continuous(labels = flabels, trans = tfun) +
