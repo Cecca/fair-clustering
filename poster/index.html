@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title></title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="styles.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"
+    integrity="sha384-GvrOXuhMATgEsSwCs4smul74iXGOixntILdUW9XmUC6+HX0sLNAK3q71HotJqlAn" crossorigin="anonymous">
+  <!-- The loading of KaTeX is deferred to speed up page rendering -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"
+    integrity="sha384-cpW21h6RZv/phavutF+AuVYrr+dA8xD9zs6FwLpaCct6O9ctzYFfFr4dgmgccOTx"
+    crossorigin="anonymous"></script>
+  <!-- To automatically render math in text elements, include the auto-render extension: -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"
+    integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"
+    onload="renderMathInElement(document.body);"></script>
+</head>
+
+<body class="">
+
+  <header class="w-full text-gray-100">
+    <div class="flex flew-row w-full gap-10 text-gray-100 text-6xl">
+      <img class="h-36" src="imgs/theWebConf2024-logo.png" alt="">
+      <div class="flex flex-row flex-grow">
+        <div class="bg-[#b99b4b] p-10 w-1/3">Research Track</div>
+        <div class="bg-[#b45f06] p-10 w-2/3">Graph Algorithms and Modeling for the Web</div>
+      </div>
+    </div>
+    <div class="bg-red-800 pb-10 pt-10">
+
+      <h1 class="text-center" style="font-size: 5.5rem;">
+        Fast and Accurate Fair \(k\)-Center Clustering in Doubling Metrics
+      </h1>
+
+
+      <div class="flex flex-row justify-between w-10/12 mx-auto text-5xl mt-5 pl-24 pr-24">
+        <div class="flex flex-row text-5xl gap-8">
+          <div class="flex flex-col text-left gap-2">
+            <span>Matteo Ceccarello</span>
+            <span>Andrea Pietracaprina</span>
+            <span>Geppino Pucci</span>
+          </div>
+          <div class="flex flex-col text-left gap-2 font-mono">
+            <span class="">matteo.ceccarello@unipd.it</span>
+            <span class="">andrea.pietracaprina@unipd.it</span>
+            <span class="">geppino.pucci@unipd.it</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col text-left gap-2">
+          <span>Università di Padova</span>
+          <span>Padova</span>
+          <span>Italy</span>
+        </div>
+
+        <img class="object-contain h-44"
+          src="https://www.unipd.it/sites/unipd.it/themes/unipd_2017/img/logo-UNIPD-white.png" alt="">
+
+        <img
+          src="https://www.acm.org/binaries/content/gallery/acm/publications/large-replication-badges/artifacts_available.jpg"
+          alt="" class="object-contain h-44">
+      </div>
+    </div>
+  </header>
+
+  <main class="grid grid-cols-3 gap-5 p-5 bg-gray-200 font-sans">
+    <div class="flex flex-col gap-5">
+      <section class="card space-y-5">
+        <h1>1. Introduction</h1>
+
+        <p>
+          In the Fair $k$-center problem, we are
+          given a set of points \(S\) in a metric space with distance function \(d\).
+        </p>
+        <p>
+          The goal is to
+          find a set of centers \( C \subseteq S \) of size \(k\)
+          and an assignment function \( \phi: S \to C \)
+          such that
+          \[
+          r_{C, \phi}(S) = \max_{x\in S} d(x, \phi(x))
+          \]
+          is minimized and
+          \[
+          \beta_\ell \le
+          \frac{
+          |\{x \in S_\ell : \phi(x) = c\}|
+          }{
+          |\{x \in S : \phi(x) = c\}|
+          }
+          \le \alpha_\ell
+          \quad
+          \forall c \in C, \ell \in \Gamma
+          \]
+          for <em>fairness parameters</em>
+          \(\alpha_\ell, \beta_\ell\)
+        </p>
+
+        <figure>
+          <caption>In this example we have two colors and a possible <em>unfair</em> 2-clustering (centers have a thick
+            border, lines encode the \(\phi\) function).</caption>
+          <img width="100%" src="imgs/example-unfair.png" alt="">
+        </figure>
+
+        <figure>
+          <caption>The same points under a <em>fair</em> 2-center clustering, where both clusters have half the points
+            of each color.</caption>
+          <img width="100%" src="imgs/example-fair.png" alt="">
+        </figure>
+
+      </section>
+
+
+      <section class="card">
+        <h1>2. Our contribution</h1>
+
+        <div class="space-y-10 mt-10">
+          <p>
+            For an input set \(S\) of doubling dimension \(D\),
+            we provide algorithm with \(3+\varepsilon\) approximation factor
+            and additive violation \(\le 4\Delta + 3 \).
+          </p>
+
+          <p>
+            When \(k, |\Gamma|, \varepsilon\), and \(D\) are constant, our algorithms require:
+          </p>
+
+          <ul class="space-y-8 mt-8 list-disc pl-10">
+            <li>
+              Linear time in the input set size in the <em class="font-bold">sequential</em> setting;
+            </li>
+            <li>
+              2 passes in the <em class="font-bold">streaming</em> setting using memory
+              \(O(\log d_{max} / d_{min})\)
+            </li>
+            <li>
+              5 round rounds in the <em class="font-bold">MapReduce/MPC</em> setting using memory \(\max\{|S|/p, p\}\),
+              where \(p\) is the
+              number of processors used.
+            </li>
+          </ul>
+        </div>
+
+      </section>
+
+      <section class="card">
+        <h1>3. Related work</h1>
+        <div class="space-y-10 mt-10">
+          <p>
+            Previous solutions to the \(k\)-center problem under fairness constraints
+            are based on linear programming [1, 2] and have been adapted to the
+            Streaming and MapReduce settings [3].
+          </p>
+          <p>
+            The scalability of such methods is hindered by the size of the linear program that needs to be solved,
+            which in the MapReduce and Streaming settings [3] depends on the number of processors.
+          </p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h1>References</h1>
+
+        <ol class="text-3xl space-y-7">
+          <li>
+            [1] Bera et al.
+            &middot;
+            <em>Fair Algorithms for Clustering</em>
+            &middot;
+            <span class="font-bold">NeurIPS 2019</span>
+          </li>
+          <li>
+            [2] Harb and Lam Author et al.
+            &middot;
+            <em>A Scalable Approximation Algorithm
+              for $k$-center Fair Clustering</em>
+            &middot;
+            <span class="font-bold">NeurIPS 2020</span>
+          </li>
+          <li>
+            [3] Bera et al.
+            &middot;
+            <em>Fair k-Center Clustering in MapReduce and Streaming Settings</em>
+            &middot;
+            <span class="font-bold">WWW 22</span>
+          </li>
+        </ol>
+      </section>
+    </div>
+
+    <div class="flex flex-col col-span-2 gap-5">
+      <section class="card">
+        <h1>4. Building the coreset</h1>
+        <div class="grid grid-cols-3 gap-y-0 items-start">
+          <img class="mx-auto" src="imgs/input-data.png" alt="">
+          <img class="mx-auto" src="imgs/coreset.png" alt="">
+          <img class="mx-auto" src="imgs/coreset-weights.png" alt="">
+
+          <p class="text-left p-8">(a) Initial dataset</p>
+          <p class="text-left p-8">(b) Build a coreset, representing each point by its nearest <em>proxy</em></p>
+          <p class="text-left p-8">(c) Then, each coreset point receives weights proportional to the number of colored
+            points it represents. </p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h1>5. Computing the solution</h1>
+
+        <div class="grid grid-cols-3 gap-y-0 items-start">
+          <img class="mx-auto" src="imgs/coreset-unfair-clustering.png" alt="">
+          <img class="mx-auto" src="imgs/coreset-fair-clustering.png" alt="">
+          <img class="mx-auto" src="imgs/coreset-final-fair-clustering.png" alt="">
+
+          <p class="text-left p-8">(d) First we find an <em>unfair</em> clustering on the coreset, ignoring color
+            information.</p>
+          <p class="text-left p-8">(e) Then, by means of linear programming
+            [cite KFC] we distribute the weight to cluster centers, fairly.</p>
+          <p class="text-left p-8">(f) Finally, we assign original points to the cluster centers.</p>
+        </div>
+
+      </section>
+
+      <section class="card">
+        <h1>6. Experimental evaluation</h1>
+
+        <div class="grid grid-cols-2 items-start gap-20">
+          <figure class="row-span-2">
+            <img src="imgs/selected-performance.png" alt="">
+            <caption>
+              Radius (top) and running time (bottom, in log scale)
+              of different algorithms vs. \(k\) (in logarithmic scale). Missing
+              points are due to timed-out runs.
+            </caption>
+          </figure>
+          <figure>
+            <img src="imgs/streaming.png" alt="">
+            <caption>
+              Streaming algorithms performance vs. memory (log
+              scale): time (left, log scale) and radius (right).
+            </caption>
+          </figure>
+          <figure>
+            <img src="imgs/mapreduce.png" alt="">
+            <caption>MapReduce algorithms performance vs. parallelism:
+              time (left) and radius (right)</caption>
+          </figure>
+        </div>
+
+      </section>
+
+
+
+      <div class="grid grid-cols-2 gap-5">
+        <section class="card">
+          <h1>8. About</h1>
+
+          <div class="grid grid-cols-2 mt-10 items-center">
+            <div class="w-full place-items-center flex flex-col space-y-10">
+              <img class="object-contain w-7/12" src="imgs/qr-paper.png" alt="">
+            </div>
+            <p class="text-2xl">
+              This work was supported, in part, by MUR of Italy, under Projects PRIN 2022TS4Y3N
+              (EXPAND: scalable algorithms for EXPloratory Analyses of heterogeneous and dynamic Networked Data), and
+              PNRR
+              CN00000013 (National Centre for HPC, Big Data and
+              Quantum Computing).
+            </p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h1>9. Datasets</h1>
+
+          <table class="w-full table-auto border-spacing-2 space-x-5 mt-10">
+            <!-- <caption class="mb-10"> -->
+            <!--   Largest datasets used in our paper. -->
+            <!-- </caption> -->
+            <thead>
+              <tr>
+                <th class="text-left">Dataset</th>
+                <th class="text-right">\(n\)</th>
+                <th class="text-right">\(d\)</th>
+                <th class="text-right">\(|\Gamma|\)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>hmda</td>
+                <td class="text-right">16 007 906</td>
+                <td class="text-right">8</td>
+                <td class="text-right">18</td>
+              </tr>
+              <tr>
+                <td>census</td>
+                <td class="text-right">2 458 285</td>
+                <td class="text-right">66</td>
+                <td class="text-right">8</td>
+              </tr>
+              <tr>
+                <td>athlete</td>
+                <td class="text-right">206 165</td>
+                <td class="text-right">3</td>
+                <td class="text-right">2</td>
+              </tr>
+              <tr>
+                <td>diabetes</td>
+                <td class="text-right">89 782</td>
+                <td class="text-right">9</td>
+                <td class="text-right">5</td>
+              </tr>
+            </tbody>
+          </table>
+
+        </section>
+      </div>
+
+    </div>
+
+    <!-- <div class="flex flex-col gap-5">
+
+      <section class="card">
+        <h1>7.</h1>
+
+
+      </section>
+
+      <section class="card">
+        <h1>8. About</h1>
+
+        <div class="grid grid-cols-2 ">
+          <div class="w-full place-items-center flex flex-col">
+            <p>Try out the code!</p>
+            <img class="object-contain" src="imgs/qr-code.png" alt="">
+          </div>
+          <div class="w-full place-items-center flex flex-col">
+            <p>Read the paper!</p>
+            <img class="object-contain" src="imgs/qr-paper.png" alt="">
+          </div>
+        </div>
+        <p class="mt-10 font-3xl">
+          This work was supported, in part, by MUR of Italy, under Projects PRIN 2022TS4Y3N
+          (EXPAND: scalable algorithms for EXPloratory Analyses of heterogeneous and dynamic Networked Data), and PNRR
+          CN00000013 (National Centre for HPC, Big Data and
+          Quantum Computing).
+        </p>
+      </section>
+
+      <section class="card">
+        <h1>9. References</h1>
+
+        <ol class="text-4xl">
+          <li>
+            [1] Author et al.
+            &middot;
+            <em>Title</em>
+            &middot;
+            <span class="font-bold">THE CONF</span>
+          </li>
+        </ol>
+
+      </section>
+    </div> -->
+  </main>
+
+</body>
+
+</html>

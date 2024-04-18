@@ -13,22 +13,26 @@ import h5py
 
 def download(url, local_filename=None):
     if local_filename is None:
-        local_filename = url.split('/')[-1]
+        local_filename = url.split("/")[-1]
     if os.path.isfile(local_filename):
         return local_filename
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
-        with open(local_filename, 'wb') as f:
+        with open(local_filename, "wb") as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
     return local_filename
 
 
 def write_hdf5(data, colors, encoders, fname):
-    from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+    from numba.core.errors import (
+        NumbaDeprecationWarning,
+        NumbaPendingDeprecationWarning,
+    )
     import warnings
-    warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
-    warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
+
+    warnings.simplefilter("ignore", category=NumbaDeprecationWarning)
+    warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
     import umap
 
     assert not np.any(np.isnan(data))
@@ -57,11 +61,15 @@ def standardize(dataset_fn):
         with h5py.File(data_name, "r") as hfp:
             data = hfp["data"][:]
             colors = hfp["colors"][:]
-            encoders = dict((k, v) for k, v in hfp["colors"].attrs.items()
-                            if k.startswith("encoding"))
+            encoders = dict(
+                (k, v)
+                for k, v in hfp["colors"].attrs.items()
+                if k.startswith("encoding")
+            )
         data = StandardScaler().fit_transform(data)
         write_hdf5(data, colors, encoders, oname)
         return oname
+
     return inner
 
 
@@ -86,14 +94,25 @@ def creditcard():
     fname = download(url, "data/creditcard.zip")
     with zipfile.ZipFile(fname) as fpzip:
         with fpzip.open("default of credit card clients.xls") as fp:
-            df = pd.read_excel(
-                fp,
-                header=1
-            )
+            df = pd.read_excel(fp, header=1)
             df = pl.from_pandas(df)
 
-    attributes = ["LIMIT_BAL", "AGE", "BILL_AMT1", "BILL_AMT2", "BILL_AMT3", "BILL_AMT4", "BILL_AMT5",
-                  "BILL_AMT6", "PAY_AMT1", "PAY_AMT2", "PAY_AMT3", "PAY_AMT4", "PAY_AMT5", "PAY_AMT6"]
+    attributes = [
+        "LIMIT_BAL",
+        "AGE",
+        "BILL_AMT1",
+        "BILL_AMT2",
+        "BILL_AMT3",
+        "BILL_AMT4",
+        "BILL_AMT5",
+        "BILL_AMT6",
+        "PAY_AMT1",
+        "PAY_AMT2",
+        "PAY_AMT3",
+        "PAY_AMT4",
+        "PAY_AMT5",
+        "PAY_AMT6",
+    ]
     colors = ["SEX", "EDUCATION", "MARRIAGE"]
 
     data = df.select(attributes).to_numpy()
@@ -101,12 +120,13 @@ def creditcard():
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
-        pl.col("SEX").map(
-            lambda c: encoders["SEX"].fit_transform(c)).explode(),
-        pl.col("MARRIAGE").map(
-            lambda c: encoders["MARRIAGE"].fit_transform(c)).explode(),
-        pl.col("EDUCATION").map(
-            lambda c: encoders["EDUCATION"].fit_transform(c)).explode()
+        pl.col("SEX").map(lambda c: encoders["SEX"].fit_transform(c)).explode(),
+        pl.col("MARRIAGE")
+        .map(lambda c: encoders["MARRIAGE"].fit_transform(c))
+        .explode(),
+        pl.col("EDUCATION")
+        .map(lambda c: encoders["EDUCATION"].fit_transform(c))
+        .explode(),
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
@@ -120,21 +140,82 @@ def census1990():
     url = "https://web.archive.org/web/20170711094723/https://archive.ics.uci.edu/ml/machine-learning-databases/census1990-mld/USCensus1990.data.txt"
     fname = download(url, "data/census1990.txt")
     df = pl.read_csv(fname).drop_nulls()
-    attributes = ["dAncstry1", "dAncstry2", "iAvail", "iCitizen", "iClass", "dDepart",
-                  "iDisabl1", "iDisabl2", "iEnglish", "iFeb55", "iFertil", "dHispanic",
-                  "dHour89", "dHours", "iImmigr", "dIncome1", "dIncome2", "dIncome3", "dIncome4", "dIncome5", "dIncome6", "dIncome7", "dIncome8", "dIndustry", "iKorean", "iLang1", "iLooking", "iMarital", "iMay75880", "iMeans", "iMilitary", "iMobility", "iMobillim", "dOccup", "iOthrserv", "iPerscare", "dPOB", "dPoverty", "dPwgt1", "iRagechld", "dRearning", "iRelat1", "iRelat2", "iRemplpar", "iRiders", "iRlabor", "iRownchld", "dRpincome", "iRPOB", "iRrelchld", "iRspouse", "iRvetserv", "iSchool", "iSept80",
-                  "iSubfam1", "iSubfam2", "iTmpabsnt", "dTravtime", "iVietnam", "dWeek89",
-                  "iWork89", "iWorklwk", "iWWII", "iYearsch", "iYearwrk", "dYrsserv"]
-    colors = ["dAge", 'iSex']
+    attributes = [
+        "dAncstry1",
+        "dAncstry2",
+        "iAvail",
+        "iCitizen",
+        "iClass",
+        "dDepart",
+        "iDisabl1",
+        "iDisabl2",
+        "iEnglish",
+        "iFeb55",
+        "iFertil",
+        "dHispanic",
+        "dHour89",
+        "dHours",
+        "iImmigr",
+        "dIncome1",
+        "dIncome2",
+        "dIncome3",
+        "dIncome4",
+        "dIncome5",
+        "dIncome6",
+        "dIncome7",
+        "dIncome8",
+        "dIndustry",
+        "iKorean",
+        "iLang1",
+        "iLooking",
+        "iMarital",
+        "iMay75880",
+        "iMeans",
+        "iMilitary",
+        "iMobility",
+        "iMobillim",
+        "dOccup",
+        "iOthrserv",
+        "iPerscare",
+        "dPOB",
+        "dPoverty",
+        "dPwgt1",
+        "iRagechld",
+        "dRearning",
+        "iRelat1",
+        "iRelat2",
+        "iRemplpar",
+        "iRiders",
+        "iRlabor",
+        "iRownchld",
+        "dRpincome",
+        "iRPOB",
+        "iRrelchld",
+        "iRspouse",
+        "iRvetserv",
+        "iSchool",
+        "iSept80",
+        "iSubfam1",
+        "iSubfam2",
+        "iTmpabsnt",
+        "dTravtime",
+        "iVietnam",
+        "dWeek89",
+        "iWork89",
+        "iWorklwk",
+        "iWWII",
+        "iYearsch",
+        "iYearwrk",
+        "dYrsserv",
+    ]
+    colors = ["dAge", "iSex"]
 
     data = df.select(attributes).to_numpy()
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
-        pl.col("iSex").map(
-            lambda c: encoders["iSex"].fit_transform(c)).explode(),
-        pl.col("dAge").map(
-            lambda c: encoders["dAge"].fit_transform(c)).explode()
+        pl.col("iSex").map(lambda c: encoders["iSex"].fit_transform(c)).explode(),
+        pl.col("dAge").map(lambda c: encoders["dAge"].fit_transform(c)).explode(),
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
@@ -148,25 +229,81 @@ def census1990_age():
     url = "https://web.archive.org/web/20170711094723/https://archive.ics.uci.edu/ml/machine-learning-databases/census1990-mld/USCensus1990.data.txt"
     fname = download(url, "data/census1990.txt")
     df = pl.read_csv(fname).drop_nulls()
-    attributes = ["dAncstry1", "dAncstry2", "iAvail", "iCitizen", "iClass", "dDepart",
-                  "iDisabl1", "iDisabl2", "iEnglish", "iFeb55", "iFertil", "dHispanic",
-                  "dHour89", "dHours", "iImmigr", "dIncome1", "dIncome2", "dIncome3",
-                  "dIncome4", "dIncome5", "dIncome6", "dIncome7", "dIncome8", "dIndustry",
-                  "iKorean", "iLang1", "iLooking", "iMarital", "iMay75880", "iMeans",
-                  "iMilitary", "iMobility", "iMobillim", "dOccup", "iOthrserv", "iPerscare",
-                  "dPOB", "dPoverty", "dPwgt1", "iRagechld", "dRearning", "iRelat1", "iRelat2",
-                  "iRemplpar", "iRiders", "iRlabor", "iRownchld", "dRpincome", "iRPOB",
-                  "iRrelchld", "iRspouse", "iRvetserv", "iSchool", "iSept80",
-                  "iSubfam1", "iSubfam2", "iTmpabsnt", "dTravtime", "iVietnam", "dWeek89",
-                  "iWork89", "iWorklwk", "iWWII", "iYearsch", "iYearwrk", "dYrsserv"]
-    colors = ["dAge", 'iSex']
+    attributes = [
+        "dAncstry1",
+        "dAncstry2",
+        "iAvail",
+        "iCitizen",
+        "iClass",
+        "dDepart",
+        "iDisabl1",
+        "iDisabl2",
+        "iEnglish",
+        "iFeb55",
+        "iFertil",
+        "dHispanic",
+        "dHour89",
+        "dHours",
+        "iImmigr",
+        "dIncome1",
+        "dIncome2",
+        "dIncome3",
+        "dIncome4",
+        "dIncome5",
+        "dIncome6",
+        "dIncome7",
+        "dIncome8",
+        "dIndustry",
+        "iKorean",
+        "iLang1",
+        "iLooking",
+        "iMarital",
+        "iMay75880",
+        "iMeans",
+        "iMilitary",
+        "iMobility",
+        "iMobillim",
+        "dOccup",
+        "iOthrserv",
+        "iPerscare",
+        "dPOB",
+        "dPoverty",
+        "dPwgt1",
+        "iRagechld",
+        "dRearning",
+        "iRelat1",
+        "iRelat2",
+        "iRemplpar",
+        "iRiders",
+        "iRlabor",
+        "iRownchld",
+        "dRpincome",
+        "iRPOB",
+        "iRrelchld",
+        "iRspouse",
+        "iRvetserv",
+        "iSchool",
+        "iSept80",
+        "iSubfam1",
+        "iSubfam2",
+        "iTmpabsnt",
+        "dTravtime",
+        "iVietnam",
+        "dWeek89",
+        "iWork89",
+        "iWorklwk",
+        "iWWII",
+        "iYearsch",
+        "iYearwrk",
+        "dYrsserv",
+    ]
+    colors = ["dAge", "iSex"]
 
     data = df.select(attributes).to_numpy()
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
-        pl.col("dAge").map(
-            lambda c: encoders["dAge"].fit_transform(c)).explode()
+        pl.col("dAge").map(lambda c: encoders["dAge"].fit_transform(c)).explode()
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
@@ -184,25 +321,43 @@ def adult():
             df = pl.read_csv(
                 fp,
                 has_header=False,
-                new_columns=["age", "workclass", "final-weight", "education", "education-num", "marital-status", "occupation",
-                             "relationship", "race", "sex", "capital-gain", "capital-loss", "hours-per-week", "native-country"],
-                null_values="?"
+                new_columns=[
+                    "age",
+                    "workclass",
+                    "final-weight",
+                    "education",
+                    "education-num",
+                    "marital-status",
+                    "occupation",
+                    "relationship",
+                    "race",
+                    "sex",
+                    "capital-gain",
+                    "capital-loss",
+                    "hours-per-week",
+                    "native-country",
+                ],
+                null_values="?",
             )
 
     colors = ["sex", "race", "marital-status"]
-    attributes = ["age", "final-weight", "education-num",
-                  "capital-gain", "hours-per-week"]
+    attributes = [
+        "age",
+        "final-weight",
+        "education-num",
+        "capital-gain",
+        "hours-per-week",
+    ]
     data = df.select(attributes).to_numpy()
     # data = StandardScaler().fit_transform(data)
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
-        pl.col("sex").map(
-            lambda c: encoders["sex"].fit_transform(c)).explode(),
-        pl.col(
-            "marital-status").map(lambda c: encoders["marital-status"].fit_transform(c)).explode(),
-        pl.col("race").map(
-            lambda c: encoders["race"].fit_transform(c)).explode()
+        pl.col("sex").map(lambda c: encoders["sex"].fit_transform(c)).explode(),
+        pl.col("marital-status")
+        .map(lambda c: encoders["marital-status"].fit_transform(c))
+        .explode(),
+        pl.col("race").map(lambda c: encoders["race"].fit_transform(c)).explode(),
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
@@ -230,25 +385,24 @@ def diabetes():
         "diag_1",
         "diag_2",
         "diag_3",
-        "number_diagnoses"
+        "number_diagnoses",
     ]
-    df = (df
-          .select(pl.col(attributes), pl.col(colors))
-          .with_columns(pl.col(["age"])
-                        .str.extract_all("(\\d)+")
-                        .list.first()
-                        .cast(pl.Int64))
-          .with_columns(pl.col(["diag_1", "diag_2", "diag_3"]).cast(pl.Float64, strict=False))
-          .drop_nulls()
-          )
+    df = (
+        df.select(pl.col(attributes), pl.col(colors))
+        .with_columns(
+            pl.col(["age"]).str.extract_all("(\\d)+").list.first().cast(pl.Int64)
+        )
+        .with_columns(
+            pl.col(["diag_1", "diag_2", "diag_3"]).cast(pl.Float64, strict=False)
+        )
+        .drop_nulls()
+    )
     data = df.select(attributes).to_numpy()
     # data = StandardScaler().fit_transform(data)
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
-        pl.col("gender").map(
-            lambda c: encoders["gender"].fit_transform(c)).explode(),
-        pl.col("race").map(
-            lambda c: encoders["race"].fit_transform(c)).explode()
+        pl.col("gender").map(lambda c: encoders["gender"].fit_transform(c)).explode(),
+        pl.col("race").map(lambda c: encoders["race"].fit_transform(c)).explode(),
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
@@ -269,10 +423,12 @@ def _kfc_csv(url, local_fname, ofname, attributes, color_columns, sep=","):
     data = df.select(attributes).to_numpy()
     # data = StandardScaler().fit_transform(data)
     encoders = dict((c, LabelEncoder()) for c in color_columns)
-    colors = df.select([
-        pl.col(column).map(lambda c: enc.fit_transform(c)).explode()
-        for column, enc in encoders.items()
-    ]).to_numpy()
+    colors = df.select(
+        [
+            pl.col(column).map(lambda c: enc.fit_transform(c)).explode()
+            for column, enc in encoders.items()
+        ]
+    ).to_numpy()
     write_hdf5(data, colors, encoders, ofname)
     return ofname
 
@@ -283,7 +439,7 @@ def four_area():
         local_fname="data/4area.csv",
         ofname="data/4area.hdf5",
         attributes=[str(c + 1) for c in range(8)],
-        color_columns=["color"]
+        color_columns=["color"],
     )
 
 
@@ -293,7 +449,7 @@ def c50():
         local_fname="data/c50.csv",
         ofname="data/c50.hdf5",
         attributes=[str(c) for c in range(10)],
-        color_columns=["color"]
+        color_columns=["color"],
     )
 
 
@@ -303,7 +459,7 @@ def victorian():
         local_fname="data/victorian.csv",
         ofname="data/victorian.hdf5",
         attributes=[str(c) for c in range(10)],
-        color_columns=["color"]
+        color_columns=["color"],
     )
 
 
@@ -312,9 +468,18 @@ def bank():
         url="https://github.com/FaroukY/KFC-ScalableFairClustering/raw/main/data/bank_categorized.csv",
         local_fname="data/bank_categorized.csv",
         ofname="data/bank_categorized.hdf5",
-        attributes=["age", "balance", "duration", "job",
-                    "education", "default", "housing", "loan", "contact"],
-        color_columns=["marital"]
+        attributes=[
+            "age",
+            "balance",
+            "duration",
+            "job",
+            "education",
+            "default",
+            "housing",
+            "loan",
+            "contact",
+        ],
+        color_columns=["marital"],
     )
 
 
@@ -335,14 +500,24 @@ def hmda():
         with zipfile.ZipFile(local) as fpzip:
             fpzip.extract("2022_combined_mlar_header.txt", "data")
 
-    attr_cols = ["loan_amount", "total_loan_costs", "origination_charges", "discount_points",
-                 "lender_credits", "interest_rate", "combined_loan_to_value_ratio", "loan_term"]
-    df = pl.scan_csv(unzipped, separator="|",
-                     null_values=["NA", ""],
-                     dtypes=dict((c, "str") for c in attr_cols),
-                     ignore_errors=False).with_columns(
-        pl.col(c).str.replace("Exempt", "0").cast(
-            "f64").fill_null(pl.lit(0)).alias(c)
+    attr_cols = [
+        "loan_amount",
+        "total_loan_costs",
+        "origination_charges",
+        "discount_points",
+        "lender_credits",
+        "interest_rate",
+        "combined_loan_to_value_ratio",
+        "loan_term",
+    ]
+    df = pl.scan_csv(
+        unzipped,
+        separator="|",
+        null_values=["NA", ""],
+        dtypes=dict((c, "str") for c in attr_cols),
+        ignore_errors=False,
+    ).with_columns(
+        pl.col(c).str.replace("Exempt", "0").cast("f64").fill_null(pl.lit(0)).alias(c)
         for c in attr_cols
     )
     color_col = "applicant_race_1"
@@ -351,16 +526,15 @@ def hmda():
 
     # Remove blatant outliers
     for attr in attr_cols:
-        df = df.filter(
-            pl.col(attr).rank(descending=True) >= 10000
-        )
+        df = df.filter(pl.col(attr).rank(descending=True) >= 10000)
     data = df.select(attr_cols).to_numpy()
     print(data.shape)
 
     encoders = dict((c, LabelEncoder()) for c in [color_col])
     colors = df.select(
-        pl.col("applicant_race_1").map(
-            lambda c: encoders["applicant_race_1"].fit_transform(c)).explode(),
+        pl.col("applicant_race_1")
+        .map(lambda c: encoders["applicant_race_1"].fit_transform(c))
+        .explode(),
     ).to_numpy()
     write_hdf5(data, colors, encoders, ofile)
     os.remove(unzipped)
@@ -371,21 +545,25 @@ def athlete():
     ofile = "data/athlete.hdf5"
     if os.path.isfile(ofile):
         return ofile
-    url = "https://github.com/rgriff23/Olympic_history/raw/master/data/athlete_events.csv"
+    url = (
+        "https://github.com/rgriff23/Olympic_history/raw/master/data/athlete_events.csv"
+    )
     local = download(url, "data/athlete.csv")
 
     attributes = ["Age", "Height", "Weight"]
     colors = ["Sex"]
 
-    df = pl.read_csv(local, null_values=["", "NA"]).select(
-        attributes + colors).drop_nulls()
+    df = (
+        pl.read_csv(local, null_values=["", "NA"])
+        .select(attributes + colors)
+        .drop_nulls()
+    )
 
     data = df.select(attributes).to_numpy()
 
     encoders = dict((c, LabelEncoder()) for c in colors)
     colors = df.select(
-        pl.col("Sex").map(
-            lambda c: encoders["Sex"].fit_transform(c)).explode()
+        pl.col("Sex").map(lambda c: encoders["Sex"].fit_transform(c)).explode()
     ).to_numpy()
 
     write_hdf5(data, colors, encoders, ofile)
@@ -405,7 +583,7 @@ DATASETS = {
     "victorian": victorian,
     "bank": bank,
     "hmda": hmda,
-    "random_dbg": random_dbg
+    "random_dbg": random_dbg,
 }
 
 # Add standardized datasets
@@ -415,8 +593,7 @@ DATASETS = {
 
 def datasets():
     """Return all dataset names"""
-    names = [k for k in DATASETS.keys() if k != "random_dbg" and k !=
-             "random_dbg-std"]
+    names = [k for k in DATASETS.keys() if k != "random_dbg" and k != "random_dbg-std"]
     return names
 
 
@@ -433,8 +610,7 @@ def load(name, color_idx, delta=0.0, prefix=None, shuffle_seed=None):
     unique_colors, color_counts = np.unique(colors, return_counts=True)
     color_proportion = color_counts / np.sum(color_counts)
     fairness_constraints = [
-        (p * (1-delta), p / (1-delta))
-        for p in color_proportion
+        (p * (1 - delta), p / (1 - delta)) for p in color_proportion
     ]
     if shuffle_seed is not None:
         rng = np.random.default_rng(shuffle_seed)

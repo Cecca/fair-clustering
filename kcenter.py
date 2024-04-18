@@ -150,12 +150,13 @@ class UnfairKCenter(object):
 
 
 class BeraEtAlKCenter(object):
-    def __init__(self, k, cplex_path=None, seed=123):
+    def __init__(self, k, cplex_path=None, seed=123, init_centers=None):
         self.k = k
         self.seed = seed
         self.solver_cmd = pulp.CPLEX_CMD(
             path=cplex_path, msg=0) if cplex_path is not None else pulp.COIN_CMD(msg=False)
         logging.info("solver is %s", self.solver_cmd)
+        self.centers = init_centers
 
     def attrs(self):
         return {}
@@ -173,7 +174,10 @@ class BeraEtAlKCenter(object):
         start = time.time()
 
         # Step 1. Find centers
-        centers, _assignment = greedy_minimum_maximum(X, self.k, seed=self.seed)
+        if self.centers is None:
+            centers, _assignment = greedy_minimum_maximum(X, self.k, seed=self.seed)
+            self.centers = centers
+        centers = self.centers
         costs = pairwise_distances(X, X[centers])
 
         # Step 2. Find assignment
@@ -255,6 +259,8 @@ class CoresetFairKCenter(object):
         # Step 2. Find the greedy centers in the coreset
         gmm_start = time.time()
         centers, assignment = greedy_minimum_maximum(coreset, self.k)
+        self.unfair_coreset_centers = centers
+        self.unfair_coreset_assignment = assignment
         print("GMM took" , time.time() - gmm_start)
         costs = pairwise_distances(coreset, coreset[centers])
 
@@ -262,6 +268,8 @@ class CoresetFairKCenter(object):
         subroutine = freq_distributor if self.subroutine_name == "freq_distributor" else weighted_fair_assignment
         coreset_centers, coreset_assignment = subroutine(
             centers, costs, weights, fairness_constraints, self.solver_cmd)
+        self.fair_coreset_centers = coreset_centers
+        self.fair_coreset_assignment = coreset_assignment.copy()
 
         # Step 4. Assign the input points to the centers found before
         centers, assignment = build_assignment(

@@ -1,5 +1,4 @@
 import logging
-
 from pulp import LpProblem, LpVariable, lpSum, LpStatus, LpConstraint, LpConstraintEQ, LpConstraintGE, LpConstraintLE
 from pulp.apis import COIN_CMD, CPLEX_CMD
 from pulp.apis.core import PulpSolverError

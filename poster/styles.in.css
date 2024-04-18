@@ -1,0 +1,43 @@
+body {
+  width: 84cm;
+  height: 119cm;
+}
+
+header {
+  height: 12.5%;
+}
+
+main {
+  height: 87.5%;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .card {
+    @apply bg-white p-10 text-4xl rounded-md shadow-xl flex-grow;
+  }
+
+  .card>h1 {
+    @apply text-5xl mb-4 font-normal;
+  }
+
+  .card {
+    @apply font-light;
+  }
+
+  tbody>tr {
+    @apply border-b-2 border-t-2 border-slate-700;
+  }
+
+  thead>tr {
+    @apply border-b-4 border-t-4 border-slate-700;
+  }
+
+  th,
+  td {
+    @apply pt-2 pb-2;
+  }
+}

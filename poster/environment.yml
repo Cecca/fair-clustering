@@ -1,0 +1,7 @@
+channels:
+  - conda-forge
+name: fair-clustering-poster
+dependencies:
+  - numpy
+  - matplotlib
+  - scikit-learn

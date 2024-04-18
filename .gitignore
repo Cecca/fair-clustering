@@ -41,3 +41,5 @@ presentation/example.csv
 presentation/example.dat
 dataset.png
 _targets
+poster/node_modules
+poster/VLDB23-poster.pdf

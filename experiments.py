@@ -10,7 +10,7 @@ import logging
 import signal
 from baseline.adapter import KFC
 
-TIMEOUT_SECS = 1*60*60 # 1 hour
+TIMEOUT_SECS = 1 * 60 * 60  # 1 hour
 
 
 class TimeoutException(Exception):
@@ -25,10 +25,10 @@ def timeout_handler(signum, frame):
 def evaluate(dataset, delta, algo, k, ofile, shuffle_seed=None):
     if results.already_run(dataset, algo.name(), k, delta, algo.attrs()):
         return
-    logging.info(
-        f"Running {algo.name()} with {algo.attrs()} on {dataset} for k={k}")
+    logging.info(f"Running {algo.name()} with {algo.attrs()} on {dataset} for k={k}")
     data, colors, fairness_constraints = datasets.load(
-        dataset, 0, delta, shuffle_seed=shuffle_seed)
+        dataset, 0, delta, shuffle_seed=shuffle_seed
+    )
 
     try:
         signal.alarm(TIMEOUT_SECS)
@@ -36,12 +36,21 @@ def evaluate(dataset, delta, algo, k, ofile, shuffle_seed=None):
         signal.alarm(0)  # Cancel the alarm
         centers = algo.centers
 
-        results.save_result(ofile, centers, assignment, dataset,
-                            algo.name(), k, delta, algo.attrs(),
-                            algo.time(), algo.additional_metrics(), shuffle_seed=shuffle_seed)
+        results.save_result(
+            ofile,
+            centers,
+            assignment,
+            dataset,
+            algo.name(),
+            k,
+            delta,
+            algo.attrs(),
+            algo.time(),
+            algo.additional_metrics(),
+            shuffle_seed=shuffle_seed,
+        )
     except TimeoutException:
-        results.save_timeout(dataset, algo.name(), k,
-                             delta, algo.attrs(), TIMEOUT_SECS)
+        results.save_timeout(dataset, algo.name(), k, delta, algo.attrs(), TIMEOUT_SECS)
 
 
 def delta_influence():
@@ -51,12 +60,9 @@ def delta_influence():
     all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
-        algos = [
-            KFC(k, cplex_path)
-        ] + [
-            kcenter.CoresetFairKCenter(
-                k, tau, cplex_path, seed=seed)
-            for tau in [32*k]
+        algos = [KFC(k, cplex_path)] + [
+            kcenter.CoresetFairKCenter(k, tau, cplex_path, seed=seed)
+            for tau in [32 * k]
             for seed in [1]
             if tau <= n
         ]
@@ -69,23 +75,28 @@ def exhaustive():
     ks = [4, 8, 16, 32, 64]
     deltas = [0.01]
     all_datasets = datasets.datasets()
-    all_datasets = [d for d in all_datasets if d not in ["census1990_age", "hmda", "census"]]
-    #all_datasets = ["athlete"]
+    all_datasets = [
+        d for d in all_datasets if d not in ["census1990_age", "hmda", "census"]
+    ]
+    # all_datasets = ["athlete"]
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
-        algos = [
-            #kcenter.Dummy(k),
-            #kcenter.UnfairKCenter(k),
-            kcenter.BeraEtAlKCenter(k, cplex_path),
-            #KFC(k, cplex_path)
-        ] + [
-            #kcenter.CoresetFairKCenter(
-            #    k, tau, cplex_path, seed=seed)
-            #for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k]
-            #for tau in [k, 32*k]
-            #for seed in [1,2,3,4,5,6,7]
-            #if tau <= n
-        ]
+        algos = (
+            [
+                # kcenter.Dummy(k),
+                # kcenter.UnfairKCenter(k),
+                kcenter.BeraEtAlKCenter(k, cplex_path),
+                # KFC(k, cplex_path)
+            ]
+            + [
+                # kcenter.CoresetFairKCenter(
+                #    k, tau, cplex_path, seed=seed)
+                # for tau in [2*k, 8*k, 32*k, 64*k, 128*k, 256*k]
+                # for tau in [k, 32*k]
+                # for seed in [1,2,3,4,5,6,7]
+                # if tau <= n
+            ]
+        )
         for algo in algos:
             evaluate(dataset, delta, algo, k, ofile)
 
@@ -97,15 +108,34 @@ def mr_experiments():
     all_datasets = ["census1990_age", "hmda"]
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
         n, dim = datasets.dataset_size(dataset)
-        for threads in [4]:# [2, 4, 8, 16]:
-            for shuffle_seed in [11234,1234,4234,1234,432,1,2,3,4,5,6,7,8,9,10,11]:
+        for threads in [4]:  # [2, 4, 8, 16]:
+            for shuffle_seed in [
+                11234,
+                1234,
+                4234,
+                1234,
+                432,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+            ]:
                 algos = [
                     mapreduce.BeraEtAlMRFairKCenter(
-                        k, threads, cplex_path, seed=shuffle_seed)
+                        k, threads, cplex_path, seed=shuffle_seed
+                    )
                 ] + [
                     mapreduce.MRCoresetFairKCenter(
-                        k, tau, threads, cplex_path, seed=shuffle_seed)
-                    for tau in [2*k]
+                        k, tau, threads, cplex_path, seed=shuffle_seed
+                    )
+                    for tau in [2 * k]
                     if tau <= n
                 ]
                 for algo in algos:
@@ -117,19 +147,21 @@ def streaming_experiments():
     ks = [32]
     deltas = [0.01]
     all_datasets = ["census1990_age", "hmda"]
-    #all_datasets = ["census1990_age"]
-    #all_datasets = datasets.datasets()
+    # all_datasets = ["census1990_age"]
+    # all_datasets = datasets.datasets()
     for dataset, delta, k in itertools.product(all_datasets, deltas, ks):
-        for shuffle_seed in range(16): #:[1,2,3,4,5,6,7,8,9,10,11,12]:
+        for shuffle_seed in range(16):  #:[1,2,3,4,5,6,7,8,9,10,11,12]:
             n, dim = datasets.dataset_size(dataset)
             algos = [
                 streaming.BeraEtAlStreamingFairKCenter(
-                    k, epsilon, cplex_path, seed=shuffle_seed)
+                    k, epsilon, cplex_path, seed=shuffle_seed
+                )
                 for epsilon in [0.1, 0.05, 0.01, 0.005, 0.001]
-                #for epsilon in [0.5, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005, 0.0002]
+                # for epsilon in [0.5, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005, 0.0002]
             ] + [
                 streaming.StreamingCoresetFairKCenter(
-                    k, k*tau, cplex_path, seed=shuffle_seed)
+                    k, k * tau, cplex_path, seed=shuffle_seed
+                )
                 for tau in [2, 4, 8, 32, 128, 512, 1024]
                 if tau <= n
             ]
@@ -156,4 +188,3 @@ if __name__ == "__main__":
     }
 
     benches[bench_name]()
-
