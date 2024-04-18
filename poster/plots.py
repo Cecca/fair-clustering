@@ -43,6 +43,8 @@ def plot_points(
     color_points=True,
     highlight=None,
     assignment=None,
+    show_lines=True,
+    hull=None,
     xlims=None,
     ylims=None,
     figsize=(4, 5),
@@ -80,7 +82,7 @@ def plot_points(
             )
 
     if assignment is not None and len(assignment.shape) == 1:
-        if not show_weights:
+        if not show_weights and show_lines:
             for point_id, center_id in enumerate(assignment):
                 p = data[point_id]
                 c = data[center_id]
@@ -138,6 +140,16 @@ def plot_points(
                             color=color_map[col],
                         )
 
+    if hull is not None:
+        import shapely
+
+        colors = ["red", "green"]
+        for c in highlight:
+            pdata = data[assignment == c]
+            pts = shapely.multipoints(pdata)
+            chull_x, chull_y = shapely.convex_hull(pts).buffer(hull).exterior.xy
+            plt.plot(chull_x, chull_y, c="black", lw=0.8)
+
     if xlims is not None:
         plt.xlim(xlims)
     if ylims is not None:
@@ -169,6 +181,8 @@ def simulation(n=20, seed=12345):
         highlight=clusterer.coreset_points_ids,
         assignment=clusterer.coreset_points_ids[clusterer.proxy],
         show_weights=False,
+        hull=0.2,
+        show_lines=False,
     )
     xlims = plt.xlim()
     ylims = plt.ylim()
@@ -195,6 +209,8 @@ def simulation(n=20, seed=12345):
         ],
         xlims=xlims,
         ylims=ylims,
+        hull=0.2,
+        show_lines=True,
     )
 
     plot_points(
@@ -217,6 +233,8 @@ def simulation(n=20, seed=12345):
         assignment=clusterer.centers[assignment],
         xlims=xlims,
         ylims=ylims,
+        hull=0.2,
+        show_lines=True,
     )
 
 
@@ -227,6 +245,8 @@ def example(
     symb_map=["▲", "■"],
     marker_map=["^", "s"],
 ):
+    from scipy.spatial import ConvexHull
+
     gen = np.random.default_rng(seed)
 
     g1 = gen.normal((0, 0), size=(n, 2))
@@ -239,18 +259,21 @@ def example(
 
     # unfair = kcenter.UnfairKCenter(2)
     # unfair_assignment = unfair.fit_predict(data, colors, fairness_constraints)
-    unfair_centers = np.array([6, n + 5])
+    unfair_centers = np.array([6, 37])
     unfair_assignment = np.array([0] * n + [1] * n).astype(np.int64)
+
     plot_points(
         "imgs/example-unfair.png",
         data,
         colors,
         highlight=unfair_centers,
         assignment=unfair_centers[unfair_assignment],
+        show_lines=False,
         figsize=(5, 3),
+        hull=0.4,
     )
 
-    fair_centers = np.array([15, 33])
+    fair_centers = np.array([6, 37])
     fair = kcenter.BeraEtAlKCenter(2, cplex_path, init_centers=fair_centers)
     fair_assignment = fair.fit_predict(data, colors, fairness_constraints)
     plot_points(
@@ -259,10 +282,11 @@ def example(
         colors,
         highlight=fair.centers,
         assignment=fair.centers[fair_assignment],
-        linestyle_map={fair.centers[0]: "--", fair.centers[1]: ":"},
+        show_lines=False,
         figsize=(5, 3),
+        hull=0.4,
     )
 
 
-# simulation(n=20)
-example()
+simulation(n=20)
+# example(seed=1234)
