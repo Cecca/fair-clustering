@@ -1,15 +1,18 @@
 \documentclass{beamer}
 
 %%% Fonts
-\usepackage[T1]{fontenc}
+%\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
 % \usepackage{roboto}
 \usepackage[scaled]{helvet}
+\usepackage{emoji}
 
 \setbeamertemplate{footline}[frame number]
 \setbeamertemplate{headline}{}
 \setbeamertemplate{navigation symbols}{}
 
 \usefonttheme[onlymath]{serif}
+%\usefonttheme{professionalfonts}
 \setbeamerfont{normal text}{family=\sffamily,size*={12pt}{14pt},series=\mdseries}
 \setbeamerfont{alerted text}{parent=normal text}
 
@@ -124,7 +127,7 @@
 	\begin{block}{Unawareness does not help}
 		Blindly ignoring protected attributes
 		is no solution: correlated features (e.g. height which correlates with
-		biological sex) can leak information about the protected attributes and thus lead to
+		sex) can leak information about the protected attributes and thus lead to
 		\emph{unfair} solutions.
 	\end{block}
 \end{frame}
@@ -153,6 +156,8 @@
 		\item Each point has one (or more) colors out of a set $\Gamma$
 		\item Parameter $k$
 	\end{itemize}
+
+  \vfill
 
 	\begin{block}{Goal}
 		Build a clustering such that the \emph{proportion} of points from
@@ -270,17 +275,31 @@
 
 \end{frame}
 
-\begin{frame}{Coreset}
-	\begin{itemize}
-		\item Set $T \subseteq S$
-    \item $|T| \ll |S|$
-		\item Proxy function $\pi: S \to T$
-		\item Weight function $w: T \to \mathbb{N}$
-	\end{itemize}
+\begin{frame}{Main idea}
+  \begin{block}{Build a \emph{coreset}}
+    \begin{itemize}
+      \item Set $T \subseteq S$
+      \item $|T| \ll |S|$
+      \item Proxy function $\pi: S \to T$
+      \item Weight function $w: T \to \mathbb{N}$
+      \pause\item Each point is \emph{close} to its proxy
+    \end{itemize}
+  \end{block}
+  
+  \vfill
+  \pause
+
+  \begin{block}{Solve the problem on the coreset}
+    \begin{itemize}
+      \item Still use linear programming
+      \pause\item Less data $\Rightarrow$ much faster!
+    \end{itemize}
+  \end{block}
 \end{frame}
 
 
 \begin{frame}{}
+  \centering
 	\only<1>{
     Locate a set of \emph{proxy points}
     \vspace{1em}
@@ -342,7 +361,7 @@
       \vspace{1em}
 
     \begin{minipage}{.4\textwidth}
-      \includegraphics[width=\textwidth]{figs/coreset-unfair-clustering.png}
+      \includegraphics[width=\textwidth]{figs/coreset-weights.png}
     \end{minipage}
     \hfill
     $\Rightarrow$
@@ -376,6 +395,19 @@
 	}
 \end{frame}
 
+\begin{frame}{}
+  \centering
+
+  \huge
+  Is this any good?
+
+  \pause\vspace{1em}
+
+  \Huge
+  \emoji{smiling-face-with-sunglasses}
+
+\end{frame}
+
 \begin{frame}{Experiments (sequential)}
   \includegraphics[width=\textwidth]{figs/selected-performance.png}
 \end{frame}
@@ -390,8 +422,13 @@
 
 \begin{frame}{}
   \begin{center}
-    \Huge
+    \huge
     Thank you!
+    \vfill
+
+    \textcolor{gray}{\small Paper link}
+
+    \includegraphics[width=.3\textwidth]{figs/qr-paper.png}
   \end{center}
 \end{frame}
 
@@ -456,7 +493,7 @@
 			\item Do a binary search on guesses over the possible clustering radii
 			\item Instantiate a linear program and find a fractional solution (if any)
 			\item If the linear program has a feasible solution,
-			      then iteratively round it (will not see today).
+			      then iteratively round it.
 		\end{enumerate}
 	\end{block}
 
@@ -465,7 +502,7 @@
 	\begin{block}{Guarantees}
 		\begin{itemize}
 			\item The algorithm provides a $3$ approximation to the radius
-			\item The fairness constraints have an additive violation up to $7$
+			\item The solution has an additive violation up to $4\Delta+3$
 		\end{itemize}
 	\end{block}
 
@@ -606,7 +643,7 @@
 		\;                                           &
 		\substack{  t \in T                                \\ c\in C  }   \textrm{ if } d(t, c) \le R
 		\\
-		\sum_{ c \in C } z_{x, c} =                  & ~
+		\sum_{ c \in C } z_{t, c} =                  & ~
 		\eqnmarkbox[skyblue]{onecluster}{w(t)}
 		\;                                           &
 		\forall t \in T
@@ -779,166 +816,38 @@
 	\annotate[yshift=-1em]{below,left}{improvement}{State of the art had $n$ here}
 \end{frame}
 
+\begin{frame}{Datasets}
+\begin{table}
+  %\caption{\label{tab:datasets} Datasets used in the experimental evaluation.}
+  \smaller
+	\begin{tabular}[t]{lrrr}
+		\toprule
+		dataset        & $n$            & $d$ & $|\Gamma|$ \\
+		\midrule
+		hmda           & 16\,007\,906 & 8          & 18         \\
+		census1990     & 2\,458\,285  & 66         & 8          \\
+		athlete        & 206\,165     & 3          & 2          \\
+		diabetes       & 89\,782      & 9          & 5          \\
+		4area          & 35\,385      & 8          & 4          \\
+		%\bottomrule
+	%\end{tabular}
+	%\begin{tabular}[t]{lrrr}
+		%\toprule
+		%dataset        & $n$            & $d$ & $|\Gamma|$ \\
+        %\midrule
+		adult          & 32\,561      & 5          & 7          \\
+		creditcard     & 30\,000      & 14         & 7          \\
+		bank           & 4\,521       & 9          & 3          \\
+		victorian      & 4\,500       & 10         & 45         \\
+		reuter\_50\_50 & 2\,500       & 10         & 50         \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+\end{frame}
+
 \end{document}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-
-\begin{frame}{Problem definition}
-	\begin{block}{Doubling dimension}
-		In a metric space of doubling dimension $D$ a ball of radius $r$
-		can be covered by $2^D$ balls of radius $r/2$.
-	\end{block}
-	\centering
-	\includegraphics[width=\textwidth]{figs/doubling-dimension.pdf}
-\end{frame}
-
-
-
-\begin{frame}{Problem definition}
-	\begin{block}{Notation}
-		\begin{itemize}
-			\item $\optu$ cost of an \emph{unfair} optimal solution
-			\item $\optf$ cost of an \emph{fair} optimal solution
-		\end{itemize}
-	\end{block}
-
-
-	\pause
-
-	\begin{block}{}
-		\[
-			\optu \le \optf
-		\]
-	\end{block}
-\end{frame}
-
-
-
-
-
-
-
-
-
-
-
-
-\begin{frame}{Starting point~\cite{DBLP:conf/nips/BeraCFN19}}
-	\vfill
-
-	Let $C$ be the set of $k$ centers found by GMM, and $R$ be a radius guess.
-
-	\vspace{1em}
-
-	\begin{align*}
-		0 \le \eqnmarkbox[vermilion]{vardef}{z_{x, c}} \le & ~ 1
-		\;                                                 &
-		% \substack{ x \in S, c\in C                               \\ \textrm{if } d(x, c) \le R}
-		\substack{ x \in S                                       \\ c\in C }  \textrm{ if } d(x, c) \le \eqnmarkbox[reddishpurple]{R}{R}
-		\\
-		\sum_{ c \in C } z_{x, c} =                        & ~ 1
-		% \eqnmarkbox[skyblue]{onecluster}{1}
-		\;                                                 &
-		\forall x \in S
-		\\
-		% Fairness lower
-		\beta_\ell \eqnmarkbox[bluishgreen]{fullcluster1}{ \sum_{x\in S} z_{x, c} }
-		\le                                                &
-		\eqnmarkbox[orange]{colorcluster}{\sum_{x'\in S_\ell} z_{x', c}}
-		\le           \alpha_\ell
-		\eqnmarkbox[bluishgreen]{fullcluster2}{\sum_{x\in S} z_{x, c}}
-		\;                                                 &
-		\forall c\in C, \ell\in\Gamma
-	\end{align*}
-
-	\annotate[yshift=1em]{above,left}{R}{Radius guess}
-	\annotate[yshift=1em]{above, right}{vardef}{Is $x$ assigned to $c$?}
-	% \annotate[yshift=.5em]{above, right}{onecluster}{Assign to only one cluster}
-	\annotate[yshift=-.5em, xshift=0em]{below, right}{colorcluster}{Points of color\\ $\ell$ assigned to $c$}
-	\annotatetwo[yshift=-3em]{below}{fullcluster1}{fullcluster2}{Size of cluster centered at $c$}
-
-	\vfill
-
-\end{frame}
-
-
-
-
-
-
-
-% \begin{frame}{Coresets}
-% 	% Let $(O_S, \phi_S)$ be an optimal $k$-center solution on $S$.
-% 	% A pointset $T \subseteq S$ is a coreset if the cost
-% 	% of an optimal solution $O_T\subseteq S$ has cost
-% 	% \[
-% 	% 	r_{O_T,\phi_T} \le
-% 	% 	(1+\epsilon)
-% 	% 	r_{O_S,\phi_S}
-% 	% \]
-% 	\begin{equation}
-% 		r_{\eqnmarkbox[orange]{tsol}{C_T, \phi_T}}(T)
-% 		\le (1 + \epsilon)
-% 		r_{\eqnmarkbox[NavyBlue]{ssol}{C_S, \phi_S}}(S)
-% 	\end{equation}
-% \end{frame}
-
-
-
-
-
-
-
-
-
-
-
-
-
-\begin{frame}{Experiments}
-	\centering
-	\includegraphics[width=\textwidth]{figs/time-vs-radius-k32-small.png}
-	\texttt{athlete} 206k points,
-	\texttt{diabetes} 90k points
-\end{frame}
-
-\begin{frame}{Experiments}
-	\centering
-	\includegraphics[width=\textwidth]{figs/time-vs-radius-k32-larger.png}
-	\texttt{hmda} 16M points,
-	\texttt{census1990} 2.5M points
-\end{frame}
-
-
-
-
-
-\begin{frame}{Conclusions}
-	\begin{block}{So what?}
-		\begin{itemize}
-			\item We have $3+\epsilon$ approximation algorithm that scales to large data
-			\item Also in MapReduce and Streaming (insertion only)
-			\item With a practical implementation (with a linear programming solver for the solution)
-		\end{itemize}
-	\end{block}
-
-	\pause
-
-	\begin{block}{And now?}
-		\begin{itemize}
-			\item Finish writing the paper \emoji{grinning-face-with-sweat}
-			\item Outliers?
-			\item Purely combinatorial algorithms?
-		\end{itemize}
-	\end{block}
-\end{frame}
-
-
-
-
-
 
 
 \end{document}
